@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.jeffthefate.dmbquiz"
+    android:versionCode="12"
+    android:versionName="2.1"
+    android:installLocation="auto" >
+    
+    <permission android:name="com.jeffthefate.dmbquiz.permission.C2D_MESSAGE" android:protectionLevel="signature" />
+    
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+    <uses-permission android:name="com.jeffthefate.dmbquiz.permission.C2D_MESSAGE" />
+
+    <application
+        android:name=".ApplicationEx"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:hardwareAccelerated="true"
+        android:allowBackup="true" >
+        <activity
+            android:name=".activity.ActivityMain"
+            android:label="@string/app_name"
+            android:theme="@style/ActivityTheme"
+            android:windowSoftInputMode="adjustPan" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service android:name="com.parse.PushService" />
+        <receiver android:name="com.parse.ParseBroadcastReceiver" >
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name="com.parse.GcmBroadcastReceiver"
+		    android:permission="com.google.android.c2dm.permission.SEND">
+		    <intent-filter>
+		        <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+		        <action android:name="com.google.android.c2dm.intent.REGISTRATION" />
+		        <category android:name="com.jeffthefate.dmbquiz" />
+		    </intent-filter>
+		</receiver>
+        <receiver
+            android:name=".receiver.PushReceiver"
+            android:exported="false" >
+			<intent-filter>
+			    <action android:name="com.jeffthefate.dmb.ACTION_NEW_QUESTIONS" />
+			    <action android:name="com.jeffthefate.dmb.ACTION_NEW_SONG" />
+			</intent-filter>
+		</receiver>
+		<receiver
+            android:name=".receiver.ConnectivityReceiver"
+            android:exported="false" >
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+		<receiver
+		    android:name=".receiver.ExternalStorageReceiver" >
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_MOUNTED" />
+                <action android:name="android.intent.action.MEDIA_REMOVED" />
+            </intent-filter>
+        </receiver>
+		<meta-data
+		    android:value="@string/facebook_app_id"
+		    android:name="com.facebook.sdk.ApplicationId" />
+    </application>
+
+</manifest>

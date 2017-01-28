@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">DMB Trivia</string>
+    
+    <string name="MyStats">Stats</string>
+    <string name="CorrectAnswers">My Correct Answers</string>
+    <string name="Error">Error</string>
+    <string name="HintsUsed">My Hints Used</string>
+    <string name="LatestQuestion">Latest Question</string>
+    <string name="StatsLoading">Calculating stats&#8230;</string>
+    <string name="LoginLoading">Fetching user info&#8230;</string>
+    <string name="Settings">Settings</string>
+    
+    <string name="enter">ENTER</string>
+    <string name="done">DONE</string>
+    <string name="retry">RETRY</string>
+    <string name="hint">HINT</string>
+    <string name="skip">SKIP</string>
+    <string name="login">LOGIN</string>
+    <string name="signup">SIGNUP</string>
+    <string name="reset">RESET PASSWORD</string>
+    <string name="justPlay">JUST PLAY</string>
+    <string name="loginEmail">EMAIL LOGIN</string>
+    <string name="hintTime">15</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="upLevel">LEVEL UP</string>
+    
+    <string name="backgroundImage">Background Image</string>
+    <string name="answerImage">Answer Image</string>
+    <string name="splashTitle">DMB Trivia</string>
+    <string name="facebookLogin">Login with Facebook</string>
+    <string name="twitterLogin">Login with Twitter</string>
+    
+    <string name="usernameHint">email address</string>
+    <string name="passwordHint">password</string>
+    
+    <string name="LoadSetlist">Setlist</string>
+    <string name="SwitchBackground">Switch Background</string>
+    <string name="LevelTitle">Level</string>
+    <string name="SoundsTitle">Sounds</string>
+    <string name="NotificationSoundsTitle">Sound</string>
+    <string name="NotificationVibrateTitle">Vibrate</string>
+    <string name="NotificationBothTitle">Sound &amp; Vibrate</string>
+    <string name="NotificationSilentTitle">Silent</string>
+    <string name="NotificationTypeStandardTitle">Default Sound</string>
+    <string name="NotificationTypeAlbumTitle">Album Specific</string>
+    <string name="NotificationTypeSongTitle">Song Specific</string>
+    <string name="LeadersTitle">Stats &amp; Standings</string>
+    <string name="LogoutTitle">Logout</string>
+    <string name="ExitTitle">Exit</string>
+    <string name="BackTitle">Back</string>
+    <string name="InfoTitle">FAQ</string>
+    <string name="FollowTitle">Follow @dmbtrivia</string>
+    <string name="LikeTitle">Like DMB Trivia</string>
+    <string name="ReportTitle">Report Question</string>
+    <string name="ShareScreen">Share Screenshot</string>
+    <string name="NotificationsTitle">Notifications</string>
+    <string name="SetlistNotificationsTitle">Setlist Updates</string>
+    <string name="NameTitle">Edit Display Name</string>
+    <string name="QuickTipsTitle">Quick Tips</string>
+    
+    <string name="ScoreDialogTitle">Scoring Notes</string>
+    <string name="NameDialogTitle">Edit Display Name</string>
+    <string name="DownloadDialogTitle">Download?</string>
+    
+    <string name="InfoText">DMB Trivia Mini-FAQ:\n\nQ: Why did my total score change since the last time I played?!?!\nA: Since the point values for questions change depending on the performance of other players (w/ more frequently answered questions decreasing in value and skipped questions increasing in value) all scores will fluctuate a bit. User scores are recalculated based on the current values of the questions they\'ve answered. This recalculation happens each time you open the app. We do this to keep the game fair regardless of how quickly you play the newest questions. The max value for any question will always be the same for all players.\n\nQ: I haven\'t played any new questions but my score on the scoreboard changed.\nA: See above. Question values are always going up or down slightly to adjust for difficulty. The score you see is based on what the point values are for questions at this moment not necessarily when you answered them (although question scores will stabilize after more and more players play them).\n\nQ: Do the point values reflect a question\'s difficulty?\nA: Yes unless the questions are new. All new questions start with a point value of 1000. The application will lower point values for a question by a small amount each time the question is answered correctly and will increase the point value for questions when they are skipped. So in general, questions with point values close to 1000 are difficult whereas questions closer to 100 (the minimum possible point value) are easier.\n\nQ: Do I lose points for guessing or getting a question wrong?\nA: No.\n\nQ: Do I lose points for skipping a question?\nA: No.\n\nQ: What happens if I use \"hint\"?\nA: The hint feature will reveal some of the letters in the masked answer but it also decreases the number of points you\'ll get if you answer the question correctly.\n\nQ: If I skip, will I be able to play that question again?\nA: Yes but with 2000+ questions it may take a while for that question to reappear.\n\nQ: Why are answers displayed when a question is skipped?\nA: The goal is to make a trivia game that attempts to inspire people to seek out new DMB audio, stories, etc. By revealing the answer we feel the app is more than a test or a quiz.\n\nQ: How are the question values calculated?\nA: A question\'s value is calculated based on the number of times it has been correctly answered and/or skipped. The maximum point value for a question is 1000 (usually the hardest) and the minimum is 100 (usually the easiest).\n\nQ: Does using a hint penalize me?\nA: Using a hint cuts the value you can earn for answering that question correctly in half.\n\nQ: How many questions are there?\nA: When we released of our first version (November 2012), we had 1300 questions available. At the start of the 2013 DMB summer tour have over 2000 questions available and that will continue to grow. The questions are stored in the cloud and we add new ones without the need for an app update. You can see the date of the most recent question in the Stats &amp; Standing menu.\n\nQ: I\'m seeing a message saying I\'ve completed all the questions. Will there be more?\nA: Yes. Questions are generally added at least once a month and we have the ability to send a push notification when new questions are added. Reopen the app to the question screen if you want to check and see if there are more playable questions. You can also check in Stats &amp; Standings to see when the most recent question was added.\n\nQ: When I play the game there is no score and I can\'t find the list of high scores.\nA: Scoring is only enabled if you are identified in some way. If you log into \"Just Play\" you won\'t see a score nor will you have access to the Stats &amp; Standings screen. Logout and login using Facebook, Twitter, or email.\n\nQ: I\'ve completed all the questions for now and I\'d like to start over. Can I do that?\nA: The best way is to logout of whichever method you logged in and then create a new account using one of the other methods (Twitter, FB, Email). If you feel you need to have a specific login and associated stats cleared completely from the game, you\'ll need to get in touch with us via @dmbtrivia or our Facebook page.\n\nQ: What if I find an error in a question or a question that can\'t be answered?\nA: While on the question open the left side menu and pick report question. All reported questions appear on a report which we review and use to make corrections/adjustments.\n\nQ: These questions are impossible - how do people know so much about DMB tours and dates?\nA: The Dave Matthews Band allows live audio recording of their concerts which are then shared by tapers. DMB also provides realtime setlist information on their website during shows. There\'s a large community of fans who download and collect live audio recordings and follow and discuss show setlists. Our scoring system will also reward you for knowing the answer to questions others skip often.\n\nQ: Who developed this game?\nA: Jeff Fate @jeffthefate (Code) and Jason Stessel @Copperpot5 (Backgrounds/Audio/Questions/Testing)\n\nQ: My friend has an iPhone, is there an iPhone version coming soon?\nA: We currently don\'t have resources to develop a version of our DMB Trivia &amp; Setlist app for any other platforms.\n\nQ: I LOVE this app! Can I donate?\nA: We don\'t ask for donations but if you have a burning desire to buy us a beer, tweet us or send a message on Facebook.</string>
+    <string name="FaqText">Scoring Mini-FAQ:\n\nQ: Why did my total score change since the last time I played?!?!\nA: Since the point values for questions change depending on the performance of other players (w/ more frequently answered questions decreasing in value and skipped questions increasing in value) all scores will fluctuate a bit. User scores are recalculated based on the current values of the questions they\'ve answered. This recalculation happens every time you open the app. We do this to keep the game fair regardless of how quickly you play the newest questions. The max value for any question will always be the same for all players.\n\nQ: I haven\'t played any new questions but my score on the scoreboard changed.\nA: See above. Question values are always going up or down slightly to adjust for difficulty. The score you see is based on what the point values are for questions at this moment not necessarily when you answered them (although question scores will stabilize after more and more players play them).\n\nQ: Do the point values reflect a question\'s difficulty?\nA: Yes unless the questions are new. All new questions start with a point value of 1000. The application will lower point values for a question by small amount each time the question is answered correctly and will increase the point value for questions when they are skipped. So in general questions with point values close to 1000 are difficult whereas questions closer to 100 (the minimum possible point value) are easier.\n\nQ: Do I lose points for guessing or getting something wrong?\nA: No.\n\nQ: Do I lose points for skipping a question?\nA: No. But, the scoring system will reward you for knowing the answer to questions others skip often.\n\nQ: What happens if I use \"hint\"?\nA: The hint feature will reveal some of the letters in the masked answer but it also decreases the number of points you\'ll get if you then answer the question correctly.\n\nQ: If I skip will I be able to play that question again?\nA: Yes but with 2000+ questions it may take a while for that question to reappear.\n\nQ: How are the question values calculated?\nA: A question\'s value is calculated based on the number of times it has been correctly answered and/or skipped. The maximum point value for a question is 1000 (usually the hardest) and the minimum is 100 (usually the easiest).\n\nQ: Does using a hint penalize me?\nA: Using a hint cuts the value you can earn for answering that question correctly in half.\n\nQ: How many questions are there?\nA: When we released of our first version (November 2012), we had 1300 DMB questions available. At the start of the 2013 DMB summer tour have over 2000 DMB questions available and that will continue to grow. The questions are stored in the cloud and we add new ones without the need for an app update. You can see the date of the most recent question in the Stats Standing menu.\n\nQ: I\'m seeing a message saying I\'ve completed all the questions. Will there be more?\nA: Yes. Questions are generally added at least once a month and we have the ability to send a push notification when new questions are added. Reopen the app to the question screen if you want to check and see if there are more playable questions. You can also check in Stats &amp; Standings to see when the most recent question was added.\n\nQ: I\'ve completed all the questions for now and I\'d like to start over. Can I do that?\nA: The best way is to logout of whichever method you logged in and then create a new account using one of the other methods (Twitter, Facebook, email). If you feel you need to have a specific login and associated stats cleared completely, you\'ll need to get in touch w/ Jeff or Jason via @dmbtrivia or our Facebook page.</string>
+    <string name="ScoreDialogText">•Wrong answers DON\'T subtract points\n•Using a Hint cuts the possible score in half\n•Your score is recalculated often and may decrease\n•Global question score decreases for each correct answer\n•Global question score increases for each Skip\n•Maximum question value is 1000\n•Minimum question value is 100\n•This makes the harder questions worth more and the easy questions worth less</string>
+    <string name="DownloadDialogText">Begin downloading song notification sounds?</string>
+    
+    <string name="ToolTipTitle">Quick Tip</string>
+    
+    <string name="sound_key">sound</string>
+    <string name="dialog_key">dialog</string>
+    <string name="notification_key">notification</string>
+    <string name="notificationsound_key">notificationSound</string>
+    <string name="notificationtype_key">notificationType</string>
+    <string name="questionids_key">questionids</string>
+    <string name="questions_key">questions</string>
+    <string name="questionanswers_key">questionanswers</string>
+    <string name="questioncategories_key">questioncategories</string>
+    <string name="questionscores_key">questionscores</string>
+    <string name="questionhints_key">questionhints</string>
+    <string name="questionskips_key">questionskips</string>
+    <string name="correct_key">correct</string>
+    <string name="quicktip_key">quicktip</string>
+    <string name="justplay_key">justplay</string>
+    <string name="level_key">level</string>
+    
+    <string name="archive_key">archive</string>
+    <string name="setlist_key">setlist</string>
+    <string name="set_date_key">setdate</string>
+    <string name="lastsong_key">lastsong</string>
+    <string name="setstamp_key">setstamp</string>
+    <string name="setvenue_key">setvenue</string>
+    <string name="setcity_key">setcity</string>
+    <string name="setlist_list_key">setlistlist</string>
+    <string name="selected_group_key">selectedgroup</string>
+    <string name="selected_child_key">selectedchild</string>
+    <string name="first_visible_key">firstvisible</string>
+    
+    <string name="hard_key">hard</string>
+    <string name="medium_key">medium</string>
+    <string name="easy_key">easy</string>
+    
+    <string name="menu_key">menu</string>
+    
+    <string name="stats_key">stats</string>
+    
+    <string name="scoretext_key">scoretext</string>
+    <string name="questiontext_key">questiontext</string>
+    <string name="hinttext_key">hinttext</string>
+    <string name="answertext_key">answertext</string>
+    <string name="placetext_key">placetext</string>
+    <string name="hinttimevis_key">hinttimevis</string>    
+    <string name="hinttextvis_key">hinttextvis</string>
+    <string name="skiptimevis_key">skiptimevis</string>
+    <string name="skiptextvis_key">skiptextvis</string>
+    <string name="hintnum_key">hintnum</string>
+    <string name="skipnum_key">skipnum</string>
+    
+    <string name="leaders">Top Scores</string>
+    
+    <string name="NoService">Service not responding</string>
+    <string name="NoConnectionToast">Can\'t detect connection</string>
+    
+    <string name="facebook_app_id">463296083721286</string>
+    <string name="facebook_name">Logging in with Facebook</string>
+    
+    <string name="ShareScreenshot">Share screenshot</string>
+    <string name="MenuImage">Menu Image</string>
+    
+    <string name="ActionsTitle">ACTIONS</string>
+    <string name="SettingsTitle">SETTINGS</string>
+    <string name="SetlistTitle">SETLIST UPDATES</string>
+    <string name="SocialTitle">SOCIAL</string>
+    <string name="VersionTitle">VERSION</string>
+    
+    <string name="left">Left Quick Tip</string>
+    
+    <string name="SetlistMenu">Setlist</string>
+    
+</resources>
