@@ -1,6 +1,7 @@
 package com.jeffthefate.dmbquiz.fragment;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -8,6 +9,7 @@ import java.util.Map.Entry;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences.Editor;
 import android.graphics.Color;
 import android.os.AsyncTask;
@@ -31,6 +33,14 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.TextView.OnEditorActionListener;
 
+import com.backendless.Backendless;
+import com.backendless.BackendlessCollection;
+import com.backendless.BackendlessUser;
+import com.backendless.async.callback.AsyncCallback;
+import com.backendless.exceptions.BackendlessException;
+import com.backendless.exceptions.BackendlessFault;
+import com.backendless.persistence.BackendlessDataQuery;
+import com.backendless.persistence.QueryOptions;
 import com.google.android.gms.analytics.HitBuilders;
 import com.jeffthefate.dmbquiz.ApplicationEx;
 import com.jeffthefate.dmbquiz.ApplicationEx.DatabaseHelperSingleton;
@@ -39,11 +49,8 @@ import com.jeffthefate.dmbquiz.ApplicationEx.SharedPreferencesSingleton;
 import com.jeffthefate.dmbquiz.Constants;
 import com.jeffthefate.dmbquiz.DatabaseHelper;
 import com.jeffthefate.dmbquiz.ImageViewEx;
+import com.jeffthefate.dmbquiz.Question;
 import com.jeffthefate.dmbquiz.R;
-import com.parse.FindCallback;
-import com.parse.ParseException;
-import com.parse.ParseObject;
-import com.parse.ParseQuery;
 
 public class FragmentQuiz extends FragmentBase {
     
@@ -103,12 +110,12 @@ public class FragmentQuiz extends FragmentBase {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-        if (!SharedPreferencesSingleton.instance().contains(
-        		ResourcesSingleton.instance().getString(R.string.sound_key))) {
+        if (!SharedPreferencesSingleton.instance(getActivity()).contains(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.sound_key))) {
         	SharedPreferencesSingleton.putBoolean(R.string.sound_key, true);
         }
-        if (!SharedPreferencesSingleton.instance().contains(
-        		ResourcesSingleton.instance().getString(R.string.quicktip_key))) {
+        if (!SharedPreferencesSingleton.instance(getActivity()).contains(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.quicktip_key))) {
         	SharedPreferencesSingleton.putBoolean(R.string.quicktip_key, true);
         }
         imm = (InputMethodManager) getActivity().getSystemService(
@@ -116,49 +123,49 @@ public class FragmentQuiz extends FragmentBase {
         if (savedInstanceState != null) {
             /*
             savedAnswer = savedInstanceState.getString("answer");
-            DatabaseHelperSingleton.instance().setUserValue(savedAnswer,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(savedAnswer,
                     DatabaseHelper.COL_ANSWER, mCallback.getUserId());
             */
             savedHint = savedInstanceState.getString("hint");
-            DatabaseHelperSingleton.instance().setUserValue(savedHint,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(savedHint,
                     DatabaseHelper.COL_HINT, mCallback.getUserId());
             skipTick = savedInstanceState.getLong("skipTick");
-            DatabaseHelperSingleton.instance().setUserValue((int) skipTick,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) skipTick,
                     DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
             hintTick = savedInstanceState.getLong("hintTick");
-            DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
                     DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
             hintPressed = savedInstanceState.getBoolean("hintPressed");
-            DatabaseHelperSingleton.instance().setUserValue(hintPressed ? 1 : 0,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(hintPressed ? 1 : 0,
                     DatabaseHelper.COL_HINT_PRESSED, mCallback.getUserId());
             skipPressed = savedInstanceState.getBoolean("skipPressed");
-            DatabaseHelperSingleton.instance().setUserValue(skipPressed ? 1 : 0,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(skipPressed ? 1 : 0,
                     DatabaseHelper.COL_SKIP_PRESSED, mCallback.getUserId());
             isCorrect = savedInstanceState.getBoolean("isCorrect");
-            DatabaseHelperSingleton.instance().setUserValue(isCorrect ? 1 : 0,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(isCorrect ? 1 : 0,
                     DatabaseHelper.COL_IS_CORRECT, mCallback.getUserId());
         }
         else {
             if (mCallback.getUserId() != null) {
                 /*
-                savedAnswer = DatabaseHelperSingleton.instance().getUserStringValue(
+                savedAnswer = DatabaseHelperSingleton.instance(getActivity()).getUserStringValue(
                         DatabaseHelper.COL_ANSWER, mCallback.getUserId());
                 if (savedAnswer != null && savedAnswer.equals(""))
                     savedAnswer = null;
                 */
-                savedHint = DatabaseHelperSingleton.instance().getUserStringValue(
+                savedHint = DatabaseHelperSingleton.instance(getActivity()).getUserStringValue(
                         DatabaseHelper.COL_HINT, mCallback.getUserId());
-                skipTick = DatabaseHelperSingleton.instance().getUserIntValue(
+                skipTick = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
                         DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
-                hintTick = DatabaseHelperSingleton.instance().getUserIntValue(
+                hintTick = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
                         DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
-                hintPressed = DatabaseHelperSingleton.instance().getUserIntValue(
+                hintPressed = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
                         DatabaseHelper.COL_HINT_PRESSED, mCallback.getUserId())
                             == 1 ? true : false;
-                skipPressed = DatabaseHelperSingleton.instance().getUserIntValue(
+                skipPressed = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
                         DatabaseHelper.COL_SKIP_PRESSED, mCallback.getUserId())
                             == 1 ? true : false;
-                isCorrect = DatabaseHelperSingleton.instance().getUserIntValue(
+                isCorrect = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
                         DatabaseHelper.COL_IS_CORRECT, mCallback.getUserId())
                             == 1 ? true : false;
             }
@@ -167,9 +174,9 @@ public class FragmentQuiz extends FragmentBase {
             hintTick = 15000;
         if (skipTick < 0)
             skipTick = 17000;
-        DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+        DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
                 DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
-        DatabaseHelperSingleton.instance().setUserValue((int) skipTick,
+        DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) skipTick,
                 DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
     }
     
@@ -189,7 +196,7 @@ public class FragmentQuiz extends FragmentBase {
         });
         */
 		background = (ImageViewEx) v.findViewById(R.id.Background);
-		setBackgroundBitmap(mCallback.getBackground(), "quiz");
+		setBackgroundBitmap(getActivity(), mCallback.getBackground(), "quiz");
         scoreText = (TextView) v.findViewById(R.id.ScoreText);
         scoreText.setOnClickListener(new OnClickListener() {
             @Override
@@ -204,12 +211,12 @@ public class FragmentQuiz extends FragmentBase {
                     mCallback.onStatsPressed();
             }
         });
-        scoreText.setText(SharedPreferencesSingleton.instance().getString(
-        		ResourcesSingleton.instance().getString(R.string.scoretext_key), ""));
+        scoreText.setText(SharedPreferencesSingleton.instance(getActivity()).getString(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.scoretext_key), ""));
         questionText = (TextView) v.findViewById(R.id.QuestionText);
         questionText.setMovementMethod(new ScrollingMovementMethod());
-        questionText.setText(SharedPreferencesSingleton.instance().getString(
-        		ResourcesSingleton.instance().getString(R.string.questiontext_key), ""));
+        questionText.setText(SharedPreferencesSingleton.instance(getActivity()).getString(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.questiontext_key), ""));
         answerText = (EditText) v.findViewById(R.id.QuestionAnswer);
         answerText.setOnEditorActionListener(new OnEditorActionListener() {
             @SuppressLint("NewApi")
@@ -222,7 +229,7 @@ public class FragmentQuiz extends FragmentBase {
                         event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
                     answerButton.setBackgroundResource(
                             R.drawable.button_disabled);
-                    answerButton.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+                    answerButton.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                     answerButton.setText("ENTER");
                     answerButton.setEnabled(false);
                     String entry = null;
@@ -251,18 +258,18 @@ public class FragmentQuiz extends FragmentBase {
                     int count){
                 /*
                 savedAnswer = s == null ? "" : s.toString();
-                DatabaseHelperSingleton.instance().setUserValue(savedAnswer,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(savedAnswer,
                         DatabaseHelper.COL_ANSWER, mCallback.getUserId());
                 */
             }
         });
-        answerText.setText(SharedPreferencesSingleton.instance().getString(
-        		ResourcesSingleton.instance().getString(R.string.answertext_key), ""));
-        answerText.setHint(SharedPreferencesSingleton.instance().getString(
-        		ResourcesSingleton.instance().getString(R.string.hinttext_key), ""));
+        answerText.setText(SharedPreferencesSingleton.instance(getActivity()).getString(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.answertext_key), ""));
+        answerText.setHint(SharedPreferencesSingleton.instance(getActivity()).getString(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.hinttext_key), ""));
         answerPlace = (TextView) v.findViewById(R.id.AnswerText);
-        answerPlace.setText(SharedPreferencesSingleton.instance().getString(
-        		ResourcesSingleton.instance().getString(R.string.placetext_key), ""));
+        answerPlace.setText(SharedPreferencesSingleton.instance(getActivity()).getString(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.placetext_key), ""));
         answerButton = (Button) v.findViewById(R.id.QuestionButton);
         answerButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -274,7 +281,7 @@ public class FragmentQuiz extends FragmentBase {
                         .setValue(1L)
                         .build());
                 answerButton.setBackgroundResource(R.drawable.button_disabled);
-                answerButton.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+                answerButton.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                 answerButton.setEnabled(false);
                 if (mCallback != null) {
                     if (mCallback.isNewQuestion()) {
@@ -316,40 +323,39 @@ public class FragmentQuiz extends FragmentBase {
                         .setValue(1L)
                         .build());
                 mCallback.setIsNewQuestion(true);
-                stagedMap.put(mCallback.getQuestionId(0),
-                		mCallback.getQuestionHint(0));
+                stagedMap.put(mCallback.getQuestionId(0), mCallback.getQuestionHint(0));
                 saveMap.put(mCallback.getQuestionId(0), true);
                 if (!ApplicationEx.getSerialsList().contains(Build.SERIAL))
                 	skipButton.setEnabled(false);
-                playAudio("skip");
+                playAudio(getActivity(), "skip");
                 savedHint = mCallback.getQuestionAnswer(0);
-                DatabaseHelperSingleton.instance().setUserValue(savedHint,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(savedHint,
                         DatabaseHelper.COL_HINT, mCallback.getUserId());
                 answerPlace.setText(savedHint);
                 hintButton.setEnabled(false);
-                hintText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+                hintText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                 hintText.setBackgroundResource(R.drawable.button_disabled);
                 answerButton.setBackgroundResource(R.drawable.button);
                 answerButton.setTextColor(Color.BLACK);
                 answerButton.setText("NEXT");
                 answerButton.setEnabled(true);
-                skipText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+                skipText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                 skipText.setBackgroundResource(R.drawable.button_disabled);
                 skipPressed = true;
-                DatabaseHelperSingleton.instance().setUserValue(skipPressed ? 1 : 0,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(skipPressed ? 1 : 0,
                         DatabaseHelper.COL_SKIP_PRESSED, mCallback.getUserId());
                 if (hintTimer != null)
                     hintTimer.cancel();
                 if (skipTimer != null)
                     skipTimer.cancel();
                 isCorrect = true;
-                DatabaseHelperSingleton.instance().setUserValue(isCorrect ? 1 : 0,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(isCorrect ? 1 : 0,
                         DatabaseHelper.COL_IS_CORRECT, mCallback.getUserId());
                 hintTick = 0;
-                DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
                         DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
                 skipTick = 0;
-                DatabaseHelperSingleton.instance().setUserValue((int) skipTick,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) skipTick,
                         DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
             } 
         });
@@ -368,12 +374,12 @@ public class FragmentQuiz extends FragmentBase {
                         .setValue(1L)
                         .build());
                 hintButton.setEnabled(false);
-                hintText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+                hintText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                 hintText.setBackgroundResource(R.drawable.button_disabled);
                 hintTick = 0;
-                DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
                         DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
-                playAudio("hint");
+                playAudio(getActivity(), "hint");
                 indicateHint();
             } 
         });
@@ -402,12 +408,12 @@ public class FragmentQuiz extends FragmentBase {
                             resumeQuestion();
                         else
                             mCallback.getNextQuestions(false,
-                            		SharedPreferencesSingleton.instance().getInt(
-                            				ResourcesSingleton.instance().getString(R.string.level_key),
+                            		SharedPreferencesSingleton.instance(getActivity()).getInt(
+                            				ResourcesSingleton.instance(getActivity()).getString(R.string.level_key),
                             				Constants.HARD));
                     }
                     else {
-                        ApplicationEx.showLongToast(R.string.NoConnectionToast);
+                        ApplicationEx.showLongToast(getActivity(), R.string.NoConnectionToast);
                         showNetworkProblem();
                     }
                 }
@@ -421,8 +427,8 @@ public class FragmentQuiz extends FragmentBase {
             	mCallback.updateLevel();
             }
         });
-        if (!SharedPreferencesSingleton.instance().getString(
-        		ResourcesSingleton.instance().getString(R.string.scoretext_key), "").equals("")) {
+        if (!SharedPreferencesSingleton.instance(getActivity()).getString(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.scoretext_key), "").equals("")) {
         	scoreText.setVisibility(View.VISIBLE);
         	questionText.setVisibility(View.VISIBLE);
         	answerText.setVisibility(View.VISIBLE);
@@ -434,10 +440,10 @@ public class FragmentQuiz extends FragmentBase {
         	hintText.setVisibility(View.INVISIBLE);
         	skipTime.setVisibility(View.VISIBLE);
         	skipText.setVisibility(View.INVISIBLE);
-        	hintTime.setText(SharedPreferencesSingleton.instance().getString(
-        			ResourcesSingleton.instance().getString(R.string.hintnum_key), ""));
-        	skipTime.setText(SharedPreferencesSingleton.instance().getString(
-        			ResourcesSingleton.instance().getString(R.string.skipnum_key), ""));
+        	hintTime.setText(SharedPreferencesSingleton.instance(getActivity()).getString(
+        			ResourcesSingleton.instance(getActivity()).getString(R.string.hintnum_key), ""));
+        	skipTime.setText(SharedPreferencesSingleton.instance(getActivity()).getString(
+        			ResourcesSingleton.instance(getActivity()).getString(R.string.skipnum_key), ""));
         }
         return v;
     }
@@ -448,7 +454,7 @@ public class FragmentQuiz extends FragmentBase {
     	/*
     	background.resetColoredViews();
     	background.addColoredView(questionText,
-        		ResourcesSingleton.instance().getColor(R.color.background_dark));
+        		ResourcesSingleton.instance(getActivity()).getColor(R.color.background_dark));
     	background.invalidate();
     	*/
     }
@@ -481,7 +487,7 @@ public class FragmentQuiz extends FragmentBase {
         @Override
         public void onTick(long millisUntilFinished) {
             skipTick = millisUntilFinished;
-            DatabaseHelperSingleton.instance().setUserValue((int) skipTick,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) skipTick,
                     DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
             skipTime.setText(Long.toString((millisUntilFinished/1000)-1));
             skipText.setVisibility(View.INVISIBLE);
@@ -498,7 +504,7 @@ public class FragmentQuiz extends FragmentBase {
         @Override
         public void onFinish() {
             skipTick = 0;
-            DatabaseHelperSingleton.instance().setUserValue((int) skipTick,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) skipTick,
                     DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
         }
     }
@@ -522,7 +528,7 @@ public class FragmentQuiz extends FragmentBase {
         @Override
         public void onTick(long millisUntilFinished) {
             hintTick = millisUntilFinished;
-            DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
                     DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
             hintTime.setText(Long.toString((millisUntilFinished/1000)+1));
             hintText.setVisibility(View.INVISIBLE);
@@ -545,7 +551,7 @@ public class FragmentQuiz extends FragmentBase {
             hintText.setBackgroundResource(R.drawable.button);
             hintTime.setVisibility(View.INVISIBLE);
             hintTick = 0;
-            DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
                     DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
         }
     }
@@ -556,22 +562,22 @@ public class FragmentQuiz extends FragmentBase {
             publishProgress();
             //savedAnswer = null;
             skipTick = 17000;
-            DatabaseHelperSingleton.instance().setUserValue((int) skipTick,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) skipTick,
                     DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
             hintTick = 15000;
-            DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
                     DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
             hintPressed = false;
-            DatabaseHelperSingleton.instance().setUserValue(hintPressed ? 1 : 0,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(hintPressed ? 1 : 0,
                     DatabaseHelper.COL_HINT_PRESSED, mCallback.getUserId());
             skipPressed = false;
-            DatabaseHelperSingleton.instance().setUserValue(skipPressed ? 1 : 0,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(skipPressed ? 1 : 0,
                     DatabaseHelper.COL_SKIP_PRESSED, mCallback.getUserId());
             savedHint = "";
-            DatabaseHelperSingleton.instance().setUserValue("",
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue("",
                     DatabaseHelper.COL_HINT, mCallback.getUserId());
             isCorrect = false;
-            DatabaseHelperSingleton.instance().setUserValue(isCorrect ? 1 : 0,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(isCorrect ? 1 : 0,
                     DatabaseHelper.COL_IS_CORRECT, mCallback.getUserId());
             return null;
         }
@@ -592,12 +598,12 @@ public class FragmentQuiz extends FragmentBase {
     public void disableButton(boolean isRetry) {
         if (!isRetry) {
             answerButton.setBackgroundResource(R.drawable.button_disabled);
-            answerButton.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+            answerButton.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
             answerButton.setEnabled(false);
         }
         else {
             retryButton.setBackgroundResource(R.drawable.button_disabled);
-            retryButton.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+            retryButton.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
             retryButton.setEnabled(false);
         }
     }
@@ -659,7 +665,7 @@ public class FragmentQuiz extends FragmentBase {
                 return null;
             mCallback.setQuestionHint(true, 0);
             hintPressed = true;
-            DatabaseHelperSingleton.instance().setUserValue(hintPressed ? 1 : 0,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(hintPressed ? 1 : 0,
                     DatabaseHelper.COL_HINT_PRESSED, mCallback.getUserId());
             if (isCancelled())
                 return null;
@@ -672,7 +678,7 @@ public class FragmentQuiz extends FragmentBase {
             if (isCancelled())
                 return null;
             savedHint = sb.toString();
-            DatabaseHelperSingleton.instance().setUserValue(savedHint,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(savedHint,
                     DatabaseHelper.COL_HINT, mCallback.getUserId());
             if (isCancelled())
                 return null;
@@ -695,7 +701,7 @@ public class FragmentQuiz extends FragmentBase {
     @Override
     public void resetHint() {
         savedHint = "";
-        DatabaseHelperSingleton.instance().setUserValue("",
+        DatabaseHelperSingleton.instance(getActivity()).setUserValue("",
                 DatabaseHelper.COL_HINT, mCallback.getUserId());
     }
     
@@ -751,7 +757,7 @@ public class FragmentQuiz extends FragmentBase {
 	            }
 	            savedHint = answer;
 	        }
-	        DatabaseHelperSingleton.instance().setUserValue(savedHint,
+	        DatabaseHelperSingleton.instance(getActivity()).setUserValue(savedHint,
 	                DatabaseHelper.COL_HINT, mCallback.getUserId());
 	        if (answerPlace != null) {
 		        answerPlace.setText(savedHint, TextView.BufferType.NORMAL);
@@ -784,21 +790,21 @@ public class FragmentQuiz extends FragmentBase {
 	                questionText.setTextColor(Color.WHITE);
 	                answerImage.setVisibility(View.INVISIBLE);
 	            }
-	            hintText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+	            hintText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
 	            hintText.setBackgroundResource(R.drawable.button_disabled);
-	            skipText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+	            skipText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
 	            skipText.setBackgroundResource(R.drawable.button_disabled);
 	            hintTick = 0;
-	            DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+	            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
 	                    DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
 	            skipTick = 0;
-	            DatabaseHelperSingleton.instance().setUserValue((int) skipTick,
+	            DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) skipTick,
 	                    DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
 	            skipPressed = true;
-	            DatabaseHelperSingleton.instance().setUserValue(skipPressed ? 1 : 0,
+	            DatabaseHelperSingleton.instance(getActivity()).setUserValue(skipPressed ? 1 : 0,
 	                    DatabaseHelper.COL_SKIP_PRESSED, mCallback.getUserId());
 	            hintPressed = true;
-	            DatabaseHelperSingleton.instance().setUserValue(hintPressed ? 1 : 0,
+	            DatabaseHelperSingleton.instance(getActivity()).setUserValue(hintPressed ? 1 : 0,
 	                    DatabaseHelper.COL_HINT_PRESSED, mCallback.getUserId());
 	        }
 	        else {
@@ -807,7 +813,7 @@ public class FragmentQuiz extends FragmentBase {
 	            questionText.setTextColor(Color.WHITE);
 	            answerImage.setVisibility(View.INVISIBLE);
 	            skipPressed = false;
-	            DatabaseHelperSingleton.instance().setUserValue(skipPressed ? 1 : 0,
+	            DatabaseHelperSingleton.instance(getActivity()).setUserValue(skipPressed ? 1 : 0,
 	                    DatabaseHelper.COL_SKIP_PRESSED, mCallback.getUserId());
 	        }
 	        hintButton.setEnabled(false);
@@ -815,7 +821,7 @@ public class FragmentQuiz extends FragmentBase {
 	        if (hintTimer != null)
 	            hintTimer.cancel();
 	        if (hintPressed) {
-	            hintText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+	            hintText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
 	            hintText.setBackgroundResource(R.drawable.button_disabled);
 	            hintText.setVisibility(View.VISIBLE);
 	            hintTime.setVisibility(View.INVISIBLE);
@@ -840,7 +846,7 @@ public class FragmentQuiz extends FragmentBase {
 	        	skipButton.setEnabled(false);
 	        skipButton.setVisibility(View.VISIBLE);
 	        if (skipPressed) {
-	            skipText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+	            skipText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
 	            skipText.setBackgroundResource(R.drawable.button_disabled);
 	            skipText.setVisibility(View.VISIBLE);
 	            skipTime.setVisibility(View.INVISIBLE);
@@ -865,7 +871,7 @@ public class FragmentQuiz extends FragmentBase {
 	        /*
 	        background.resetColoredViews();
 	        background.addColoredView(questionText,
-	        		ResourcesSingleton.instance().getColor(R.color.background_dark));
+	        		ResourcesSingleton.instance(getActivity()).getColor(R.color.background_dark));
 	    	background.invalidate();
 	    	*/
     	}
@@ -883,43 +889,43 @@ public class FragmentQuiz extends FragmentBase {
                 if (!mCallback.questionIdsEmpty() &&
                 		mCallback.getQuestionId(0) != null) {
                     mCallback.getNextQuestions(true,
-                    		SharedPreferencesSingleton.instance().getInt(
-                    				ResourcesSingleton.instance().getString(R.string.level_key),
+                    		SharedPreferencesSingleton.instance(getActivity()).getInt(
+                    				ResourcesSingleton.instance(getActivity()).getString(R.string.level_key),
                     				Constants.HARD));
                     //resumeQuestion();
                 }
                 else {
-                    showNoMoreQuestions(SharedPreferencesSingleton.instance().getInt(
-                    		ResourcesSingleton.instance().getString(R.string.level_key), Constants.HARD));
+                    showNoMoreQuestions(SharedPreferencesSingleton.instance(getActivity()).getInt(
+                    		ResourcesSingleton.instance(getActivity()).getString(R.string.level_key), Constants.HARD));
                     retryButton.setBackgroundResource(
                             R.drawable.button_disabled);
                     retryButton.setTextColor(
-                            ResourcesSingleton.instance().getColor(R.color.light_gray));
+                            ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                     retryButton.setText("CHECKING FOR QUESTIONS");
                     retryButton.setVisibility(View.VISIBLE);
                     retryButton.setEnabled(false);
                     mCallback.getNextQuestions(false,
-                    		SharedPreferencesSingleton.instance().getInt(
-                    				ResourcesSingleton.instance().getString(R.string.level_key),
+                    		SharedPreferencesSingleton.instance(getActivity()).getInt(
+                    				ResourcesSingleton.instance(getActivity()).getString(R.string.level_key),
                     				Constants.HARD));
                 }
             }
             else {
-                ApplicationEx.showLongToast(R.string.NoConnectionToast);
+                ApplicationEx.showLongToast(getActivity(), R.string.NoConnectionToast);
                 showNetworkProblem();
             }
         }
-        if (!SharedPreferencesSingleton.instance().contains(
-        		ResourcesSingleton.instance().getString(R.string.menu_key))) {
+        if (!SharedPreferencesSingleton.instance(getActivity()).contains(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.menu_key))) {
             /*
 	        showQuickTipMenu(quickTipLeftView, "Swipe from left for menu",
 	        		Constants.QUICK_TIP_LEFT | Constants.QUICK_TIP_TOP);
 	        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD)
-	        	SharedPreferencesSingleton.instance().edit().putBoolean(
-	        			ResourcesSingleton.instance().getString(R.string.menu_key), true).commit();
+	        	SharedPreferencesSingleton.instance(getActivity()).edit().putBoolean(
+	        			ResourcesSingleton.instance(getActivity()).getString(R.string.menu_key), true).commit();
 	        else
-	        	SharedPreferencesSingleton.instance().edit().putBoolean(
-	        			ResourcesSingleton.instance().getString(R.string.menu_key), true).apply();
+	        	SharedPreferencesSingleton.instance(getActivity()).edit().putBoolean(
+	        			ResourcesSingleton.instance(getActivity()).getString(R.string.menu_key), true).apply();
 			*/
         }
     }
@@ -932,33 +938,30 @@ public class FragmentQuiz extends FragmentBase {
             hintTimer.cancel();
         if (hintTask != null)
             hintTask.cancel(true);
-        Editor editor = SharedPreferencesSingleton.instance().edit();
-        editor.putString(ResourcesSingleton.instance().getString(R.string.scoretext_key),
+        Editor editor = SharedPreferencesSingleton.instance(getActivity()).edit();
+        editor.putString(ResourcesSingleton.instance(getActivity()).getString(R.string.scoretext_key),
         		scoreText.getText().toString());
-        editor.putString(ResourcesSingleton.instance().getString(R.string.questiontext_key),
+        editor.putString(ResourcesSingleton.instance(getActivity()).getString(R.string.questiontext_key),
         		questionText.getText().toString());
-        editor.putString(ResourcesSingleton.instance().getString(R.string.hinttext_key),
+        editor.putString(ResourcesSingleton.instance(getActivity()).getString(R.string.hinttext_key),
         		answerText.getHint().toString());
-        editor.putString(ResourcesSingleton.instance().getString(R.string.answertext_key),
+        editor.putString(ResourcesSingleton.instance(getActivity()).getString(R.string.answertext_key),
         		answerText.getText().toString());
-        editor.putString(ResourcesSingleton.instance().getString(R.string.placetext_key),
+        editor.putString(ResourcesSingleton.instance(getActivity()).getString(R.string.placetext_key),
         		answerPlace.getText().toString());
-        editor.putInt(ResourcesSingleton.instance().getString(R.string.hinttimevis_key),
+        editor.putInt(ResourcesSingleton.instance(getActivity()).getString(R.string.hinttimevis_key),
         		hintTime.getVisibility());
-        editor.putInt(ResourcesSingleton.instance().getString(R.string.hinttextvis_key),
+        editor.putInt(ResourcesSingleton.instance(getActivity()).getString(R.string.hinttextvis_key),
         		hintText.getVisibility());
-        editor.putInt(ResourcesSingleton.instance().getString(R.string.skiptimevis_key),
+        editor.putInt(ResourcesSingleton.instance(getActivity()).getString(R.string.skiptimevis_key),
         		skipTime.getVisibility());
-        editor.putInt(ResourcesSingleton.instance().getString(R.string.skiptextvis_key),
+        editor.putInt(ResourcesSingleton.instance(getActivity()).getString(R.string.skiptextvis_key),
         		skipText.getVisibility());
-        editor.putString(ResourcesSingleton.instance().getString(R.string.hintnum_key),
+        editor.putString(ResourcesSingleton.instance(getActivity()).getString(R.string.hintnum_key),
         		hintTime.getText().toString());
-        editor.putString(ResourcesSingleton.instance().getString(R.string.skipnum_key),
+        editor.putString(ResourcesSingleton.instance(getActivity()).getString(R.string.skipnum_key),
         		skipTime.getText().toString());
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD)
-        	editor.commit();
-        else
-        	editor.apply();
+        editor.apply();
         if (!stagedMap.isEmpty())
         	stageQuestions(mCallback.getUserId());
         if (!saveMap.isEmpty())
@@ -989,20 +992,20 @@ public class FragmentQuiz extends FragmentBase {
                 mCallback.addCorrectAnswer(questionId);
                 mCallback.addCurrentScore(currScore);
                 publishProgress();
-                playAudio("correct");
+                playAudio(getActivity(), "correct");
                 hintTick = 0;
-                DatabaseHelperSingleton.instance().setUserValue((int) hintTick,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) hintTick,
                         DatabaseHelper.COL_HINT_TICK, mCallback.getUserId());
                 skipTick = 0;
-                DatabaseHelperSingleton.instance().setUserValue((int) skipTick,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue((int) skipTick,
                         DatabaseHelper.COL_SKIP_TICK, mCallback.getUserId());
                 hintPressed = true;
-                DatabaseHelperSingleton.instance().setUserValue(hintPressed ? 1 : 0,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(hintPressed ? 1 : 0,
                         DatabaseHelper.COL_HINT_PRESSED, mCallback.getUserId());
                 skipPressed = true;
-                DatabaseHelperSingleton.instance().setUserValue(skipPressed ? 1 : 0,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(skipPressed ? 1 : 0,
                         DatabaseHelper.COL_SKIP_PRESSED, mCallback.getUserId());
-                DatabaseHelperSingleton.instance().setUserValue(isCorrect ? 1 : 0,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(isCorrect ? 1 : 0,
                         DatabaseHelper.COL_IS_CORRECT, mCallback.getUserId());
                 if (wrongTimer != null)
                     wrongTimer.cancel();
@@ -1010,9 +1013,9 @@ public class FragmentQuiz extends FragmentBase {
             }
             else {
                 isCorrect = false;
-                playAudio("wrong");
+                playAudio(getActivity(), "wrong");
                 publishProgress();
-                DatabaseHelperSingleton.instance().setUserValue(isCorrect ? 1 : 0,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(isCorrect ? 1 : 0,
                         DatabaseHelper.COL_IS_CORRECT, mCallback.getUserId());
             }
             return null;
@@ -1021,7 +1024,7 @@ public class FragmentQuiz extends FragmentBase {
         protected void onProgressUpdate(Void... nothing) {
             if (isCorrect) {
                 if (mCallback.getCurrentScore() > -1 &&
-                        !DatabaseHelperSingleton.instance().isAnonUser(userId)) {
+                        !DatabaseHelperSingleton.instance(getActivity()).isAnonUser(userId)) {
                     scoreText.setText(
                             Integer.toString(mCallback.getCurrentScore()));
                     scoreText.setVisibility(View.VISIBLE);
@@ -1033,7 +1036,7 @@ public class FragmentQuiz extends FragmentBase {
                 if (skipTimer != null)
                     skipTimer.cancel();
                 savedHint = mCallback.getQuestionAnswer(0);
-                DatabaseHelperSingleton.instance().setUserValue(savedHint,
+                DatabaseHelperSingleton.instance(getActivity()).setUserValue(savedHint,
                         DatabaseHelper.COL_HINT, mCallback.getUserId());
                 answerPlace.setText(savedHint);
                 hintText.setVisibility(View.VISIBLE);
@@ -1053,9 +1056,9 @@ public class FragmentQuiz extends FragmentBase {
                 answerButton.setEnabled(true);
                 answerButton.setBackgroundResource(R.drawable.button);
                 answerButton.setTextColor(Color.BLACK);
-                hintText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+                hintText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                 hintText.setBackgroundResource(R.drawable.button_disabled);
-                skipText.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+                skipText.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                 skipText.setBackgroundResource(R.drawable.button_disabled);
             }
             else {
@@ -1077,86 +1080,166 @@ public class FragmentQuiz extends FragmentBase {
             if (isCorrect)
             	saveMap.put(mCallback.getQuestionId(0), false);
             isCorrect = false;
-            DatabaseHelperSingleton.instance().setUserValue(isCorrect ? 1 : 0,
+            DatabaseHelperSingleton.instance(getActivity()).setUserValue(isCorrect ? 1 : 0,
                     DatabaseHelper.COL_IS_CORRECT, mCallback.getUserId());
         }
     }
-    
+
+    /**
+     * Get all "CorrectAnswers" associated with user and given questions
+     * Remove all already answers, if any, from the local correct answers
+     * Add correct answers
+     *
+     * (Get all "correct" relations for user and given questions)
+     * (Get user with "correct" relations loaded)
+     * (Remove any already existing correct answers from the local list)
+     * (Add new correct answers to user)
+     * (Save user)
+     * @param userId
+     */
     private void saveAnswers(final String userId) {
-        ParseQuery<ParseObject> query = new ParseQuery<ParseObject>("CorrectAnswers");
-        query.whereEqualTo("userId", userId);
-        query.whereContainedIn("objectId", correctMap.keySet());
-        query.findInBackground(new FindCallback<ParseObject>() {
-            @Override
-            public void done(List<ParseObject> answers, ParseException e) {
-                if (e != null && e.getCode() != 101) {
-                    Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
-                    showNetworkProblem();
-                }
-                else {
-                	ParseObject correctAnswer;
-                	for (ParseObject answer : answers) {
-                		correctMap.remove(answer.getString("questionId"));
-                	}
-                    for (Entry<String, Boolean> answer :
-                    		correctMap.entrySet()) {
-                    	correctAnswer = new ParseObject("CorrectAnswers");
-                    	correctAnswer.put("questionId", answer.getKey());
-                        correctAnswer.put("userId", userId);
-                        correctAnswer.put("hint", answer.getValue());
-                        try {
-                            correctAnswer.saveEventually();
-                        } catch (RuntimeException exception) {}
+        List<String> relations = new ArrayList<>(1);
+        relations.add("correct");
+        Backendless.Persistence.of(BackendlessUser.class).loadRelations(
+                Backendless.UserService.CurrentUser(), relations,
+                new AsyncCallback<BackendlessUser>() {
+                    @Override
+                    public void handleResponse(final BackendlessUser currentUser) {
+                        // Get all correct with current user
+                        BackendlessDataQuery query = new BackendlessDataQuery();
+                        String whereClause = "Users[correct].username = '" + userId + "'";
+                        if (!correctMap.isEmpty()) {
+                            whereClause += " AND ";
+                            whereClause += buildInclusionWhereClause(new ArrayList<>(correctMap.keySet()));
+                        }
+                        query.setWhereClause(whereClause);
+                        Backendless.Persistence.of(Question.class).find(query,
+                                new AsyncCallback<BackendlessCollection<Question>>() {
+                                    @Override
+                                    public void handleResponse(BackendlessCollection<Question> questionCollection) {
+                                        List<Question> questions = questionCollection.getCurrentPage();
+                                        for (Question question : questions) {
+                                            correctMap.remove(question.getObjectId());
+                                        }
+                                        // All have left is ones to add to correct
+                                        // Get the questions with the ids remaining, then add them
+                                        if (!correctMap.isEmpty()) {
+                                            BackendlessDataQuery query = new BackendlessDataQuery();
+                                            query.setWhereClause(buildInclusionWhereClause(new ArrayList<>(correctMap.keySet())));
+                                            Backendless.Persistence.of(Question.class).find(query,
+                                                    new AsyncCallback<BackendlessCollection<Question>>() {
+                                                        @Override
+                                                        public void handleResponse(BackendlessCollection<Question> questionCollection) {
+                                                            List<Question> corrects = Arrays.asList((Question[]) currentUser.getProperty("correct"));
+                                                            List<Question> questions = questionCollection.getCurrentPage();
+                                                            corrects.addAll(questions);
+                                                            Backendless.UserService.update(currentUser, new AsyncCallback<BackendlessUser>() {
+                                                                @Override
+                                                                public void handleResponse(BackendlessUser response) {
+                                                                    correctMap.clear();
+                                                                }
+
+                                                                @Override
+                                                                public void handleFault(BackendlessFault fault) {
+                                                                    Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                                                    showNetworkProblem();
+                                                                }
+                                                            });
+                                                        }
+
+                                                        @Override
+                                                        public void handleFault(BackendlessFault fault) {
+                                                            Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                                            showNetworkProblem();
+                                                        }
+                                                    });
+                                        }
+                                    }
+
+                                    @Override
+                                    public void handleFault(BackendlessFault fault) {
+                                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                        showNetworkProblem();
+                                    }
+                                }
+                        );
                     }
-                    correctMap.clear();
+
+                    @Override
+                    public void handleFault(BackendlessFault fault) {
+                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                        showNetworkProblem();
+                    }
                 }
-            }
-        });
+        );
     }
 
+    /**
+     * Get a subset of questions to save
+     * For each of those, increase the score if skipped; decrease the score if not skipped
+     * Save
+     */
     private void saveQuestionScores() {
-        ParseQuery<ParseObject> query = new ParseQuery<ParseObject>("Question");
-        query.whereContainedIn("objectId", saveMap.keySet());
-        query.findInBackground(new FindCallback<ParseObject>() {
-            @Override
-            public void done(List<ParseObject> questions, ParseException e) {
-                if (e == null) {
-                    String currScore;
-                    Number number;
-                    boolean isSkip = false;
-                    for (ParseObject question : questions) {
-                    	number = question.getNumber("score");
-                    	isSkip = saveMap.get(question.getObjectId());
-                        if (number != null) {
-                            int score = number.intValue();
-                            if (isSkip) {
-                                currScore = Integer.toString((int)(score/0.99));
-                                if (Integer.parseInt(currScore) > 1000)
-                                    currScore = "1000";
+        BackendlessDataQuery query = new BackendlessDataQuery();
+        if (saveMap.isEmpty()) {
+            return;
+        }
+        query.setWhereClause(buildInclusionWhereClause(new ArrayList<>(saveMap.keySet())));
+        Backendless.Persistence.of(Question.class).find(query,
+                new AsyncCallback<BackendlessCollection<Question>>() {
+                    @Override
+                    public void handleResponse(BackendlessCollection<Question> questionCollection) {
+                        List<Question> questions = questionCollection.getCurrentPage();
+                        Integer currScore;
+                        Integer score;
+                        boolean isSkip;
+                        for (Question question : questions) {
+                            score = question.getScore();
+                            isSkip = saveMap.get(question.getObjectId());
+                            if (score != null) {
+                                if (isSkip) {
+                                    currScore = (int)(score/0.99);
+                                    if (currScore > 1000) {
+                                        currScore = 1000;
+                                    }
+                                }
+                                else {
+                                    currScore = (int)(score*0.99);
+                                    if (currScore < 100) {
+                                        currScore = 100;
+                                    }
+                                }
                             }
                             else {
-                                currScore = Integer.toString((int)(score*0.99));
-                                if (Integer.parseInt(currScore) < 100)
-                                    currScore = "100";
+                                currScore = 1000;
+                            }
+                            if (score != null || !isSkip) {
+                                question.setScore(currScore);
+                                Backendless.Persistence.of(Question.class).save(question,
+                                        new AsyncCallback<Question>() {
+                                    @Override
+                                    public void handleResponse(Question response) {
+                                        // TODO
+                                    }
+
+                                    @Override
+                                    public void handleFault(BackendlessFault fault) {
+                                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                        showNetworkProblem();
+                                    }
+                                });
                             }
                         }
-                        else
-                            currScore = "1000";
-                        if (number != null || (number == null && !isSkip)) {
-                            question.put("score", Integer.parseInt(currScore));
-                            try {
-                                question.saveEventually();
-                            } catch (RuntimeException err) {}
-                        }
+                        saveMap.clear();
                     }
-                    saveMap.clear();
+
+                    @Override
+                    public void handleFault(BackendlessFault fault) {
+                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                        showNetworkProblem();
+                    }
                 }
-                else {
-                    Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
-                    showNetworkProblem();
-                }
-            }
-        });
+        );
     }
     
     @Override
@@ -1200,7 +1283,7 @@ public class FragmentQuiz extends FragmentBase {
         /*
         background.resetColoredViews();
         background.addColoredView(questionText,
-        		ResourcesSingleton.instance().getColor(R.color.background_dark));
+        		ResourcesSingleton.instance(getActivity()).getColor(R.color.background_dark));
         background.invalidate();
         */
         retryText.setVisibility(View.INVISIBLE);
@@ -1240,7 +1323,7 @@ public class FragmentQuiz extends FragmentBase {
 	            skipTimer.cancel();
 	        hintButton.setVisibility(View.INVISIBLE);
 	        skipButton.setVisibility(View.INVISIBLE);
-	        retryButton.setText(ResourcesSingleton.instance().getString(R.string.retry));
+	        retryButton.setText(ResourcesSingleton.instance(getActivity()).getString(R.string.retry));
 	        retryButton.setVisibility(View.VISIBLE);
 	        scoreText.setVisibility(View.INVISIBLE);
         } catch (NullPointerException e) {}
@@ -1264,47 +1347,162 @@ public class FragmentQuiz extends FragmentBase {
         if (mCallback.getQuestionHint(0))
             currScore = currScore / 2;
     }
-    
+
+    private String buildInclusionWhereClause(ArrayList<String> objectIds) {
+        String whereClause = "objectId IN (";
+        for (String objectId : objectIds) {
+            whereClause += "'";
+            whereClause += objectId;
+            whereClause += "',";
+        }
+        whereClause = whereClause.substring(0, whereClause.lastIndexOf(","));
+        whereClause += ")";
+        return whereClause;
+    }
+
+    /**
+     * Query Stage objects related to given user and skipped questions
+     * For each of those, set the hint and skip values then save it
+     * If there are any not yet in "Stage", add it to Stage
+     * @param userId
+     */
     private void stageQuestions(final String userId) {
-        ParseQuery<ParseObject> query = new ParseQuery<ParseObject>("Stage");
-        query.whereEqualTo("userId", userId);
-        query.whereContainedIn("questionId", stagedMap.keySet());
-        //query.whereEqualTo("questionId", questionId);
-        query.findInBackground(new FindCallback<ParseObject>() {
-            @Override
-            public void done(List<ParseObject> answers, ParseException e) {
-                if (e != null && e.getCode() != 101) {
-                    Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
-                    showNetworkProblem();
-                }
-                else {
-                	String currQuestionId = null;
-                	HashMap<String, Boolean> map = new HashMap<String, Boolean>(stagedMap);
-                	stagedMap.clear();
-                	for (ParseObject parseAnswer : answers) {
-                		currQuestionId = parseAnswer.getString("questionId");
-                		parseAnswer.put("hint", map.get(currQuestionId));
-                		parseAnswer.put("skip", true);
-                        try {
-                        	parseAnswer.saveEventually();
-                        } catch (RuntimeException exception) {}
-                        map.remove(currQuestionId);
-                	}
-                    if (!map.isEmpty()) {
-                    	ParseObject stageAnswer = new ParseObject("Stage");
-                    	for (Entry<String, Boolean> stage : map.entrySet()) {
-	                        stageAnswer.put("questionId", stage.getKey());
-	                        stageAnswer.put("userId", userId);
-	                        stageAnswer.put("hint", stage.getValue());
-	                        stageAnswer.put("skip", true);
-	                        try {
-	                            stageAnswer.saveEventually();
-	                        } catch (RuntimeException exception) {}
-                    	}
+        List<String> relations = new ArrayList<>(2);
+        relations.add("hint");
+        relations.add("skip");
+        Backendless.Persistence.of(BackendlessUser.class).loadRelations(
+            Backendless.UserService.CurrentUser(), relations,
+                new AsyncCallback<BackendlessUser>() {
+                    @Override
+                    public void handleResponse(final BackendlessUser currentUser) {
+                        // Get all questions with current user
+                        BackendlessDataQuery query = new BackendlessDataQuery();
+                        String whereClause = "Users[skip].username = '" + userId + "'";
+                        if (!stagedMap.isEmpty()) {
+                            whereClause += " AND ";
+                            whereClause += buildInclusionWhereClause(new ArrayList<>(stagedMap.keySet()));
+                        }
+                        query.setWhereClause(whereClause);
+                        Backendless.Persistence.of(Question.class).find(query,
+                                new AsyncCallback<BackendlessCollection<Question>>() {
+                                    @Override
+                                    public void handleResponse(BackendlessCollection<Question> questionCollection) {
+                                        HashMap<String, Boolean> map = new HashMap<>(stagedMap);
+                                        List<Question> questions = questionCollection.getCurrentPage();
+                                        for (Question question : questions) {
+                                            map.remove(question.getObjectId());
+                                        }
+                                        // All have left is ones to add to skip
+                                        // Get the questions with the ids remaining, then add them
+                                        if (!map.isEmpty()) {
+                                            BackendlessDataQuery query = new BackendlessDataQuery();
+                                            query.setWhereClause(buildInclusionWhereClause(new ArrayList<>(map.keySet())));
+                                            Backendless.Persistence.of(Question.class).find(query,
+                                                    new AsyncCallback<BackendlessCollection<Question>>() {
+                                                @Override
+                                                public void handleResponse(BackendlessCollection<Question> questionCollection) {
+                                                    List<Question> skips = Arrays.asList((Question[]) currentUser.getProperty("skip"));
+                                                    List<Question> questions = questionCollection.getCurrentPage();
+                                                    skips.addAll(questions);
+                                                    Backendless.UserService.update(currentUser, new AsyncCallback<BackendlessUser>() {
+                                                        @Override
+                                                        public void handleResponse(BackendlessUser response) {
+                                                            // TODO
+                                                        }
+
+                                                        @Override
+                                                        public void handleFault(BackendlessFault fault) {
+                                                            Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                                            showNetworkProblem();
+                                                        }
+                                                    });
+                                                }
+
+                                                @Override
+                                                public void handleFault(BackendlessFault fault) {
+                                                    Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                                    showNetworkProblem();
+                                                }
+                                            });
+                                        }
+                                        // Get hints
+                                        BackendlessDataQuery query = new BackendlessDataQuery();
+                                        String whereClause = "Users[hint].username = '" + userId + "'";
+                                        if (!correctMap.isEmpty()) {
+                                            whereClause += " AND ";
+                                            whereClause += buildInclusionWhereClause(new ArrayList<>(stagedMap.keySet()));
+                                        }
+                                        query.setWhereClause(whereClause);
+                                        Backendless.Persistence.of(Question.class).find(query,
+                                                new AsyncCallback<BackendlessCollection<Question>>() {
+                                                    @Override
+                                                    public void handleResponse(BackendlessCollection<Question> questionCollection) {
+                                                        HashMap<String, Boolean> map = new HashMap<>(stagedMap);
+                                                        stagedMap.clear();
+                                                        List<Question> questions = questionCollection.getCurrentPage();
+                                                        for (Question question : questions) {
+                                                            map.remove(question.getObjectId());
+                                                        }
+                                                        // All have left is ones to add to hint
+                                                        // Get the questions with the ids remaining, then add them
+                                                        if (!map.isEmpty()) {
+                                                            BackendlessDataQuery query = new BackendlessDataQuery();
+                                                            query.setWhereClause(buildInclusionWhereClause(new ArrayList<>(map.keySet())));
+                                                            Backendless.Persistence.of(Question.class).find(query,
+                                                                    new AsyncCallback<BackendlessCollection<Question>>() {
+                                                                        @Override
+                                                                        public void handleResponse(BackendlessCollection<Question> questionCollection) {
+                                                                            List<Question> hints = Arrays.asList((Question[]) currentUser.getProperty("hint"));
+                                                                            List<Question> questions = questionCollection.getCurrentPage();
+                                                                            hints.addAll(questions);
+                                                                            Backendless.UserService.update(currentUser, new AsyncCallback<BackendlessUser>() {
+                                                                                @Override
+                                                                                public void handleResponse(BackendlessUser response) {
+                                                                                    // TODO
+                                                                                }
+
+                                                                                @Override
+                                                                                public void handleFault(BackendlessFault fault) {
+                                                                                    Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                                                                    showNetworkProblem();
+                                                                                }
+                                                                            });
+                                                                        }
+
+                                                                        @Override
+                                                                        public void handleFault(BackendlessFault fault) {
+                                                                            Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                                                            showNetworkProblem();
+                                                                        }
+                                                                    });
+                                                        }
+                                                    }
+
+                                                    @Override
+                                                    public void handleFault(BackendlessFault fault) {
+                                                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                                        showNetworkProblem();
+                                                    }
+                                                }
+                                        );
+                                    }
+
+                                    @Override
+                                    public void handleFault(BackendlessFault fault) {
+                                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                                        showNetworkProblem();
+                                    }
+                                }
+                        );
+                    }
+
+                    @Override
+                    public void handleFault(BackendlessFault fault) {
+                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
+                        showNetworkProblem();
                     }
                 }
-            }
-        });
+        );
     }
     
     @Override
@@ -1312,7 +1510,7 @@ public class FragmentQuiz extends FragmentBase {
         retryButton.setBackgroundResource(
                 R.drawable.button_disabled);
         retryButton.setTextColor(
-                ResourcesSingleton.instance().getColor(R.color.light_gray));
+                ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
         retryButton.setText("CHECKING FOR QUESTIONS");
         retryButton.setVisibility(View.VISIBLE);
         retryButton.setEnabled(false);

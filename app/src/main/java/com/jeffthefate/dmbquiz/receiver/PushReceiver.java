@@ -36,6 +36,8 @@ import com.jeffthefate.dmbquiz.R;
 import com.jeffthefate.dmbquiz.SetInfo;
 import com.jeffthefate.dmbquiz.activity.ActivityMain;
 
+// TODO Update to extend BackendlessBroadcastReceiver
+// http://support.backendless.com/topic/custom-push-notification-and-handle-onclick
 public class PushReceiver extends BroadcastReceiver {
     
     private NotificationCompat.Builder nBuilder;
@@ -54,57 +56,44 @@ public class PushReceiver extends BroadcastReceiver {
         		Context.WIFI_SERVICE);
         multicastLock = wm.createMulticastLock(Constants.PUSH_WIFI_LOCK);
         multicastLock.acquire();
-        if (Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.HONEYCOMB) {
-        	new ReceiveTask(intent).execute();
-        }
-        else {
-        	new ReceiveTask(intent).executeOnExecutor(
-        			AsyncTask.THREAD_POOL_EXECUTOR);
-        }
+        new ReceiveTask(context, intent).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
     
     private class ReceiveTask extends AsyncTask<Void, Void, Void> {
+        private Context context;
     	private Intent intent;
     	
-    	private ReceiveTask(Intent intent) {
+    	private ReceiveTask(Context context, Intent intent) {
+            this.context = context;
     		this.intent = intent;
     	}
     	
         @Override
         protected Void doInBackground(Void... nothing) {
         	// {"action":"com.jeffthefate.dmb.ACTION_NEW_QUESTIONS"}
-            nManager = (NotificationManager) ApplicationEx.getApp()
-                    .getSystemService(Context.NOTIFICATION_SERVICE);
+            nManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             String action = intent.getAction();
             if (action.equals(Constants.ACTION_NEW_QUESTIONS)) {
                 if (!ApplicationEx.isActive() &&
-                		SharedPreferencesSingleton.instance().getBoolean(
-                				ApplicationEx.getApp().getString(
-                						R.string.notification_key),
-        						true)) {
+                        SharedPreferencesSingleton.instance(context).getBoolean(context.getString(
+                						R.string.notification_key), true)) {
                     // Show notification that starts app
-                    Intent notificationIntent = new Intent(
-                            ApplicationEx.getApp(), ActivityMain.class);
+                    Intent notificationIntent = new Intent(context, ActivityMain.class);
                     //ParseAnalytics.trackAppOpened(notificationIntent);
                     notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | 
                             Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    PendingIntent pendingIntent = PendingIntent.getActivity(
-                                ApplicationEx.getApp(), 0, notificationIntent,
-                                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-                    nBuilder = new NotificationCompat.Builder(
-                            ApplicationEx.getApp());
+                    PendingIntent pendingIntent = PendingIntent.getActivity(context, 0,
+                            notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+                    nBuilder = new NotificationCompat.Builder(context);
                     nBuilder.setLargeIcon(BitmapFactory.decodeResource(
-                    		ResourcesSingleton.instance(),
-                                R.drawable.notification_large)).
-                        setSmallIcon(R.drawable.notification_large).
-                        setWhen(System.currentTimeMillis()).
-                        setContentTitle("New questions added").
-                        setContentText("Touch to play DMB Trivia").
-                        setContentIntent(pendingIntent);
+                            ResourcesSingleton.instance(context), R.drawable.notification_large))
+                        .setSmallIcon(R.drawable.notification_large)
+                        .setWhen(System.currentTimeMillis())
+                        .setContentTitle("New questions added")
+                        .setContentText("Touch to play DMB Trivia")
+                        .setContentIntent(pendingIntent);
                     nManager.cancel(Constants.NOTIFICATION_NEW_QUESTIONS);
-                    nManager.notify(null, Constants.NOTIFICATION_NEW_QUESTIONS,
-                    		nBuilder.build());
+                    nManager.notify(null, Constants.NOTIFICATION_NEW_QUESTIONS, nBuilder.build());
                 }
             }
             else if (action.equals(Constants.ACTION_NEW_SONG)) {
@@ -115,10 +104,10 @@ public class PushReceiver extends BroadcastReceiver {
                 String latestSetVenue = "";
                 String latestSetCity = "";
                 try {
-                	if (!intent.hasExtra("com.parse.Data"))
-                		throw new JSONException("No data sent!");
-                    json = new JSONObject(intent.getExtras().getString(
-                            "com.parse.Data"));
+                	if (!intent.hasExtra("com.parse.Data")) {
+                        throw new JSONException("No data sent!");
+                    }
+                    json = new JSONObject(intent.getExtras().getString("com.parse.Data"));
                     SetInfo setInfo = new SetInfo();
                     latestSong = json.getString("song");
                     latestSet = json.getString("setlist");
@@ -130,38 +119,29 @@ public class PushReceiver extends BroadcastReceiver {
                     latestSetCity = json.getString("venueCity");
                     setInfo.setSetCity(latestSetCity);
                     setInfo.setArchive(false);
-                    FileCacheSingleton fileCacheSingleton =
-                    		FileCacheSingleton.instance();
-                    fileCacheSingleton.saveSerializableToFile(
-                    		Constants.LATEST_SET_FILE, setInfo);
+                    FileCacheSingleton fileCacheSingleton = FileCacheSingleton.instance(context);
+                    fileCacheSingleton.saveSerializableToFile(Constants.LATEST_SET_FILE, setInfo);
                     ApplicationEx.parseSetlist(latestSet);
-                    Editor editor = SharedPreferencesSingleton.instance()
-                    		.edit();
-                    editor.putString(ResourcesSingleton.instance().getString(
-                    		R.string.lastsong_key), latestSong);
-                    editor.putString(ResourcesSingleton.instance().getString(
+                    Editor editor = SharedPreferencesSingleton.instance(context).edit();
+                    editor.putString(ResourcesSingleton.instance(context).getString(
+                            R.string.lastsong_key), latestSong);
+                    editor.putString(ResourcesSingleton.instance(context).getString(
                     		R.string.setlist_key), latestSet);
-                    editor.putString(ResourcesSingleton.instance().getString(
+                    editor.putString(ResourcesSingleton.instance(context).getString(
                     		R.string.set_date_key), latestSetDate);
-                    editor.putString(ResourcesSingleton.instance().getString(
+                    editor.putString(ResourcesSingleton.instance(context).getString(
                     		R.string.setvenue_key), latestSetVenue);
-                    editor.putString(ResourcesSingleton.instance().getString(
+                    editor.putString(ResourcesSingleton.instance(context).getString(
                     		R.string.setcity_key), latestSetCity);
-                    editor.putBoolean(ResourcesSingleton.instance().getString(
+                    editor.putBoolean(ResourcesSingleton.instance(context).getString(
                     		R.string.archive_key), false);
                     StringBuilder sb = new StringBuilder();
                     sb.append("Updated:\n");
                     sb.append(ApplicationEx.getUpdatedDateString(
                     		Long.parseLong(json.getString("timestamp"))));
-                    editor.putString(ResourcesSingleton.instance().getString(
+                    editor.putString(ResourcesSingleton.instance(context).getString(
                     		R.string.setstamp_key), sb.toString());
-                    if (Build.VERSION.SDK_INT <
-                    		Build.VERSION_CODES.GINGERBREAD) {
-                    	editor.commit();
-                    }
-                    else {
-                    	editor.apply();
-                    }
+                    editor.apply();
                     /*
                     StringBuilder sb = new StringBuilder();
                     sb.append("Updated:\n");
@@ -171,7 +151,7 @@ public class PushReceiver extends BroadcastReceiver {
                     Intent setIntent = new Intent(
                     		Constants.ACTION_UPDATE_SETLIST);
                     setIntent.putExtra("success", true);
-                    ApplicationEx.getApp().sendBroadcast(setIntent);
+                    context.sendBroadcast(setIntent);
                     /*
                     ApplicationEx.parseSetlist();
                     ParseQuery setlistQuery = new ParseQuery("Setlist");
@@ -200,17 +180,15 @@ public class PushReceiver extends BroadcastReceiver {
                 } catch (JSONException e) {
                     Log.e(Constants.LOG_TAG, "Bad push notification data!", e);
                 }
-                if (latestSong != null && !latestSong.equals("null") &&
-                        !latestSong.equals("") && SharedPreferencesSingleton
-                        .instance().getBoolean(ApplicationEx.getApp().getString(
+                if (latestSong != null && !latestSong.equals("null") && !latestSong.equals("") &&
+                        SharedPreferencesSingleton.instance(context).getBoolean(context.getString(
                                 R.string.notification_key), true)) {
                 	nManager.cancel(Constants.NOTIFICATION_NEW_SONG);
-                	ApplicationEx.findMatchingAudio(latestSong);
-                    nBuilder = new NotificationCompat.Builder(
-                            ApplicationEx.getApp());
+                	ApplicationEx.findMatchingAudio(context, latestSong);
+                    nBuilder = new NotificationCompat.Builder(context);
                     Bitmap largeIcon = ApplicationEx.resizeImage(
-                    		ResourcesSingleton.instance(),
-                            ApplicationEx.findMatchingImage(latestSong));
+                    		ResourcesSingleton.instance(context),
+                            ApplicationEx.findMatchingImage(context, latestSong));
                     nBuilder.setLargeIcon(largeIcon)
                     	.setSmallIcon(R.drawable.notification_large)
                         .setWhen(System.currentTimeMillis())
@@ -226,8 +204,8 @@ public class PushReceiver extends BroadcastReceiver {
                     					.bigText(bigText));
                     	}
                     }
-                    switch (SharedPreferencesSingleton.instance().getInt(
-                    		ResourcesSingleton.instance().getString(
+                    switch (SharedPreferencesSingleton.instance(context).getInt(
+                    		ResourcesSingleton.instance(context).getString(
                     				R.string.notificationsound_key), 0)) {
                     case 0:
                     	Log.i(Constants.LOG_TAG, "soundSetting: 0");
@@ -244,13 +222,12 @@ public class PushReceiver extends BroadcastReceiver {
                         break;
                     }
                     Intent notificationIntent = new Intent(
-                            ApplicationEx.getApp(), ActivityMain.class);
+                            context, ActivityMain.class);
                     notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | 
                             Intent.FLAG_ACTIVITY_SINGLE_TOP);
                     notificationIntent.putExtra("setlist", true);
-                    PendingIntent pendingIntent = PendingIntent.getActivity(
-                                ApplicationEx.getApp(), 0, notificationIntent,
-                                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                    PendingIntent pendingIntent = PendingIntent.getActivity(context, 0,
+                            notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
                     nBuilder.setContentIntent(pendingIntent);
                     StringBuilder sb = new StringBuilder();
                     if (ApplicationEx.setlistList != null &&
@@ -304,7 +281,7 @@ public class PushReceiver extends BroadcastReceiver {
     public static String getNotificationString(String latestSet,
     		String latestSong) {
     	CircularFifoQueue<String> circularFifoQueue =
-    			new CircularFifoQueue<String>(7);
+    			new CircularFifoQueue<>(7);
     	List<String> latestList = Arrays.asList(
     			StringUtils.split(latestSet, "\n"));
     	latestList = latestList.subList(4, latestList.size()-1);

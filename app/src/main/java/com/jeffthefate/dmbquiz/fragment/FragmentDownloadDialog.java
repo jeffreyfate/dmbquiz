@@ -25,7 +25,7 @@ public class FragmentDownloadDialog extends DialogFragment {
         	public void onClick(DialogInterface dialog, int id) {
         		if (!ApplicationEx.isDownloading())
 	        		ApplicationEx.downloadSongClips(
-	    				DatabaseHelperSingleton.instance()
+	    				DatabaseHelperSingleton.instance(getActivity())
 	        				.getNotificatationsToDownload());
         		dismiss();
         	}

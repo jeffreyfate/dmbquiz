@@ -46,31 +46,30 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.backendless.Backendless;
+import com.backendless.BackendlessCollection;
+import com.backendless.async.callback.AsyncCallback;
+import com.backendless.exceptions.BackendlessFault;
+import com.backendless.logging.Logger;
+import com.backendless.persistence.BackendlessDataQuery;
+import com.backendless.persistence.QueryOptions;
 import com.jeffthefate.stacktrace.ExceptionHandler;
 import com.jeffthefate.stacktrace.ExceptionHandler.OnStacktraceListener;
-import com.parse.FindCallback;
-import com.parse.Parse;
-import com.parse.ParseException;
-import com.parse.ParseFacebookUtils;
-import com.parse.ParseFile;
-import com.parse.ParseInstallation;
-import com.parse.ParseObject;
-import com.parse.ParseQuery;
-import com.parse.ParseTwitterUtils;
-import com.parse.SaveCallback;
 
 /**
  * Used as a holder of many values and objects for the entire application.
- * 
+ *
+ * For Backendless error codes, see:
+ * https://backendless.com/documentation/data/android/error_handling.htm
+ *
  * @author Jeff Fate
  */
 @SuppressLint("ShowToast")
 public class ApplicationEx extends Application implements OnStacktraceListener {
 
-    private static Context app;
+    private Logger logger = Backendless.Logging.getLogger(ApplicationEx.class);
+
     private static boolean mHasConnection = false;
     private static boolean mIsActive = false;
-    private static ConnectivityManager connMan;
     /**
      * Path to the application's external cache
      */
@@ -132,78 +131,38 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     	private SharedPreferencesSingleton() {}
     	
     	private static SharedPreferences sharedPrefs = null;
+        private static Resources resources = null;
     	
     	/**
     	 * Get an instance, creating it if necessary, of the shared preferences
     	 * object for the application
     	 * @return shared preferences object for the application's preferences
     	 */
-    	public static SharedPreferences instance() {
-    		if (sharedPrefs == null)
-    			sharedPrefs = PreferenceManager.getDefaultSharedPreferences(app);
+    	public static SharedPreferences instance(Context context) {
+    		if (sharedPrefs == null) {
+                sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+            }
+            if (resources == null) {
+                resources = ResourcesSingleton.instance(context);
+            }
     		return sharedPrefs;
     	}
     	
     	public static void toggleBoolean(int resId, boolean def) {
-    		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD) {
-                instance().edit().putBoolean(ResourcesSingleton.instance()
-                		.getString(resId), !instance().getBoolean(
-                        		ResourcesSingleton.instance().getString(resId),
-                        		def))
-                .commit();
-    		}
-            else {
-            	instance().edit().putBoolean(ResourcesSingleton.instance()
-                		.getString(resId), !instance().getBoolean(
-                        		ResourcesSingleton.instance().getString(resId),
-                        		def))
-                .apply();
-            }
+            sharedPrefs.edit().putBoolean(resources.getString(resId),
+                    !sharedPrefs.getBoolean(resources.getString(resId),def)).apply();
     	}
     	
     	public static void putBoolean(int resId, boolean newValue) {
-    		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD) {
-                SharedPreferencesSingleton.instance().edit().putBoolean(
-                		ResourcesSingleton.instance().getString(resId),
-                        newValue)
-                .commit();
-    		}
-            else {
-                SharedPreferencesSingleton.instance().edit().putBoolean(
-                		ResourcesSingleton.instance().getString(resId),
-                        newValue)
-                .apply();
-            }
+            sharedPrefs.edit().putBoolean(resources.getString(resId), newValue).apply();
     	}
     	
     	public static void putString(int resId, String newValue) {
-    		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD) {
-                SharedPreferencesSingleton.instance().edit().putString(
-                		ResourcesSingleton.instance().getString(resId),
-                        newValue)
-                .commit();
-    		}
-            else {
-                SharedPreferencesSingleton.instance().edit().putString(
-                		ResourcesSingleton.instance().getString(resId),
-                        newValue)
-                .apply();
-            }
+            sharedPrefs.edit().putString(resources.getString(resId), newValue).apply();
     	}
     	
     	public static void putInt(int resId, int newValue) {
-    		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD) {
-                SharedPreferencesSingleton.instance().edit().putInt(
-                		ResourcesSingleton.instance().getString(resId),
-                        newValue)
-                .commit();
-    		}
-            else {
-                SharedPreferencesSingleton.instance().edit().putInt(
-                		ResourcesSingleton.instance().getString(resId),
-                        newValue)
-                .apply();
-            }
+            sharedPrefs.edit().putInt(resources.getString(resId), newValue).apply();
     	}
     	
     }
@@ -221,10 +180,12 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     	 * Get an instance, creating it if necessary, of the shared preferences
     	 * object for the application
     	 * @return shared preferences object for the application's preferences
+         * @param context
     	 */
-    	public static DatabaseHelper instance() {
-    		if (dbHelper == null)
-    			dbHelper = DatabaseHelper.getInstance();
+    	public static DatabaseHelper instance(Context context) {
+    		if (dbHelper == null) {
+                dbHelper = DatabaseHelper.getInstance(context);
+            }
     		return dbHelper;
     	}
     }
@@ -243,9 +204,10 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     	 * object for the application
     	 * @return shared preferences object for the application's preferences
     	 */
-    	public static Resources instance() {
-    		if (res == null)
-    			res = getApp().getResources();
+    	public static Resources instance(Context context) {
+    		if (res == null) {
+                res = context.getResources();
+            }
     		return res;
     	}
     }
@@ -255,26 +217,23 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     	private static String cacheLocation;
     	private static String fileLocation;
     	
-    	public static FileCacheSingleton instance() {
+    	public static FileCacheSingleton instance(Context context) {
     		if (fileCacheSingleton == null) {
     			fileCacheSingleton = new FileCacheSingleton();
     		}
-    		if (cacheLocation == null) {
-    			cacheLocation = ApplicationEx.getApp().getExternalCacheDir()
-    					.getAbsolutePath();
-    			fileLocation = ApplicationEx.getApp().getFilesDir()
-    					.getAbsolutePath();
+    		if (cacheLocation == null && context.getExternalCacheDir() != null &&
+                    context.getFilesDir() != null) {
+    			cacheLocation = context.getExternalCacheDir().getAbsolutePath();
+    			fileLocation = context.getFilesDir().getAbsolutePath();
     		}
     		return fileCacheSingleton;
     	}
     	
     	public String createLocation(String dir) {
     		File path = new File(dir);
-            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.FROYO) {
-                path.setExecutable(true, false);
-                path.setReadable(true, false);
-                path.setWritable(true, false);
-            }
+            path.setExecutable(true, false);
+            path.setReadable(true, false);
+            path.setWritable(true, false);
             path.mkdirs();
             return path.getAbsolutePath();
     	}
@@ -342,73 +301,74 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
                 return null;
             }
         };
-        app = this;
-        mToast = Toast.makeText(app, "", Toast.LENGTH_LONG);
+        mToast = Toast.makeText(this, "", Toast.LENGTH_LONG);
         String state = Environment.getExternalStorageState();
         if (Environment.MEDIA_MOUNTED.equals(state)) {
             cacheLocation = getExternalCacheDir().getAbsolutePath();
             File path = new File(cacheLocation + Constants.SCREENS_LOCATION);
-            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.FROYO) {
-                path.setExecutable(true, false);
-                path.setReadable(true, false);
-                path.setWritable(true, false);
-            }
+            path.setExecutable(true, false);
+            path.setReadable(true, false);
+            path.setWritable(true, false);
             path.mkdirs();
             path = new File(cacheLocation + Constants.AUDIO_LOCATION);
-            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.FROYO) {
-                path.setExecutable(true, false);
-                path.setReadable(true, false);
-                path.setWritable(true, false);
-            }
+            path.setExecutable(true, false);
+            path.setReadable(true, false);
+            path.setWritable(true, false);
             path.mkdirs();
         }
         /*
         Parse.initialize(this, "6pJz1oVHAwZ7tfOuvHfQCRz6AVKZzg1itFVfzx2q",
                 "2ocGkdBygVyNStd8gFQQgrDyxxZJCXt3K1GbRpMD");
         */
-        Backendless.initApp(this, "", "", "v1");
+        Backendless.initApp(this, "F1672081-F7D4-EF63-FFB1-BB39109F8500",
+                "FDD4D19E-F228-22AC-FF44-2F9FA5528300", "v1");
+        /**
         Parse.initialize(this, "ImI8mt1EM3NhZNRqYZOyQpNSwlfsswW73mHsZV3R",
                 "hpTbnpuJ34zAFLnpOAXjH583rZGiYQVBWWvuXsTo");
         ParseFacebookUtils.initialize(this);
         ParseTwitterUtils.initialize("xWnkCrbGRNGMVs2HDyShQ",
                 "xaDerd1mUtfmjyuANARkuvNBrQFgsVpQmhYWDjnirOw");
+         */
         ExceptionHandler.register(this);
-        connMan = ((ConnectivityManager) getSystemService(
+        ConnectivityManager connMan = ((ConnectivityManager) getSystemService(
                 Context.CONNECTIVITY_SERVICE));
         NetworkInfo nInfo = connMan.getActiveNetworkInfo();
-        if (nInfo == null) {
-            mHasConnection = false;
-        }
-        else {
+        if (nInfo != null) {
             mHasConnection = nInfo.isConnected();
         }
-        DatabaseHelperSingleton.instance().checkUpgrade();
+        DatabaseHelperSingleton.instance(getApplicationContext()).checkUpgrade();
         //setlist = "Jun 1 2013\nDave Matthews Band\nBlossom Music Center\nCuyahoga Falls, OH\n\nDancing Nancies ->\nWarehouse\nThe Idea Of You\nBelly Belly Nice\nSave Me\nCaptain\nSeven";
         //setlistStamp = "Updated:\n8:16 PDT";
-        generateSongMap();
-        ParseInstallation installation = ParseInstallation.getCurrentInstallation();
-        // TODO Remove if memory issues resolved
-        try {
-        	installation.saveEventually();
-        } catch (RuntimeException e) {}
-        String notificationType = ResourcesSingleton.instance().getString(
+        generateSongMap(getApplicationContext());
+        Backendless.Messaging.registerDevice("596253330527", "setlist", new AsyncCallback<Void>() {
+            @Override
+            public void handleResponse(Void response) {
+                // TODO
+            }
+
+            @Override
+            public void handleFault(BackendlessFault fault) {
+                // TODO Handle this the same way as other errors connecting to the backend
+            }
+        });
+        String notificationType = ResourcesSingleton.instance(getApplicationContext()).getString(
         		R.string.notificationtype_key);
         try {
-        	SharedPreferencesSingleton.putInt(R.string.notificationtype_key,
-        			SharedPreferencesSingleton.instance().getBoolean(
-            				notificationType, false) ? 1 : 0);
-        } catch (ClassCastException e) {}
-        getSetlist();
+            SharedPreferencesSingleton.putInt(R.string.notificationtype_key,
+                    SharedPreferencesSingleton.instance(getApplicationContext()).getBoolean(
+                            notificationType, false) ? 1 : 0);
+        } catch (ClassCastException e) {
+            // TODO
+        }
+        getSetlist(getApplicationContext());
         /*
         if (SharedPreferencesSingleton.instance().getInt(notificationType, 0) ==
         		2 && !isDownloading())
 	        downloadSongClips(DatabaseHelperSingleton.instance()
 	        		.getNotificatationsToDownload());
 	    */
-        Log.v(Constants.LOG_TAG, "SERIAL: " + Build.SERIAL);
-        // TODO Remove this when deploying
-        Parse.setLogLevel(Parse.LOG_LEVEL_VERBOSE);
-        
+        // Log.v(Constants.LOG_TAG, "SERIAL: " + Build.SERIAL);
+
         serialsList = new ArrayList<String>(0);
         // Jay's old Incredible
         serialsList.add("HT1BNS215989");
@@ -419,54 +379,68 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         // Jay's LG G2
         serialsList.add("017d103f6390e474");
     }
-    /**
-     * Used by other classes to get the application's global context.
-     * @return the context of the application
-     */
-    public static Context getApp() {
-        return app;
-    }
     
     @Override
     public void onStacktrace(String appPackage, String packageVersion,
             String deviceModel, String androidVersion, String stacktrace) {
-        ParseObject object = new ParseObject("Log");
-        object.put("androidVersion", androidVersion);
-        object.put("appPackage", appPackage);
-        object.put("deviceModel", deviceModel);
-        object.put("packageVersion", packageVersion);
-        object.put("stacktrace", stacktrace);
-        try {
-            object.saveInBackground();
-        } catch (ExceptionInInitializerError e) {};
+        com.jeffthefate.dmbquiz.Log log = new com.jeffthefate.dmbquiz.Log();
+        log.setAndroidVersion(androidVersion);
+        log.setPackageVersion(packageVersion);
+        log.setDeviceModel(deviceModel);
+        log.setAppPackage(appPackage);
+        log.setStacktrace(stacktrace);
+        Backendless.Persistence.of(com.jeffthefate.dmbquiz.Log.class).save(log,
+                new AsyncCallback<com.jeffthefate.dmbquiz.Log>() {
+            @Override
+            public void handleResponse(com.jeffthefate.dmbquiz.Log response) {
+                // TODO
+            }
+
+            @Override
+            public void handleFault(BackendlessFault fault) {
+                // TODO Handle like other actions that fail talking to backend
+            }
+        });
     }
     
     /**
      * Reports question to Parse to indicate there is an error in the question
      * or answer
      * @param questionId	identifier in the Parse class
-     * @param question		question text
+     * @param questionText	question text
      * @param answer		answer text
      * @param score			current score
      */
-    public static void reportQuestion(String questionId, String question,
+    public static void reportQuestion(String questionId, String questionText,
             String answer, String score) {
-        if (questionId != null && question != null && answer != null &&
-                score != null) {
-            ParseObject object = new ParseObject("Report");
-            object.put("questionId", questionId);
-            object.put("question", question);
-            object.put("answer", answer);
-            object.put("score", score);
-            object.saveInBackground(new SaveCallback() {
+        if (questionId != null && questionText != null && answer != null && score != null) {
+            Question question = new Question();
+            question.setObjectId(questionId);
+            question.setQuestion(questionText);
+            question.setAnswer(answer);
+            try {
+                question.setScore(Integer.parseInt(score));
+            } catch (NumberFormatException e) {
+                // TODO
+            }
+
+            Report report = new Report();
+            report.setQuestion(question);
+
+            Backendless.Persistence.save(report, new AsyncCallback<Report>() {
                 @Override
-                public void done(ParseException arg0) {
-                	showLongToast("Report sent, thank you");
+                public void handleResponse(Report response) {
+                    showLongToast("Report sent, thank you");
+                }
+
+                @Override
+                public void handleFault(BackendlessFault fault) {
+                    // TODO
                 }
             });
+        } else {
+            // TODO
         }
-        else
-        	showLongToast("Report sent, thank you");
     }
     
     /**
@@ -505,16 +479,17 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * @param dir directory to be deleted
      * @return true if delete was successful
      */
-    public static boolean deleteDir(File dir) {
-        if (dir != null && dir.isDirectory()) {
-            String[] children = dir.list();
-            for (int i = 0; i < children.length; i++) {
-                boolean success = deleteDir(new File(dir, children[i]));
-                if (!success)
-                    return false;
+    public static void deleteDir(File dir) {
+        if (dir != null) {
+            if (dir.isDirectory()) {
+                String[] children = dir.list();
+                for (String child : children) {
+                    deleteDir(new File(dir, child));
+                }
+            } else {
+                dir.delete();
             }
         }
-        return dir.delete();
     }
     
     /**
@@ -546,9 +521,8 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * @param answers	{@link java.util.ArrayList ArrayList} of
      * 					{@link java.lang.String Strings} to assign to the key
      */
-    public static void setStringArrayPref(String key,
-            ArrayList<String> answers) {
-        SharedPreferences.Editor editor = SharedPreferencesSingleton.instance().edit();
+    public static void setStringArrayPref(Context context, String key, ArrayList<String> answers) {
+        SharedPreferences.Editor editor = SharedPreferencesSingleton.instance(context).edit();
         if (answers == null) {
             editor.remove(key);
         }
@@ -561,12 +535,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
                 editor.putString(key, null);
             }
         }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD) {
-        	editor.commit();
-        }
-        else {
-        	editor.apply();
-        }
+        editor.apply();
     }
     
     /**
@@ -576,11 +545,11 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * 		   {@link java.lang.String Strings} containing the preference
      * 		   matching the given key
      */
-    public static ArrayList<String> getStringArrayPref(String key) {
-        String json = SharedPreferencesSingleton.instance().getString(key, null);
+    public static ArrayList<String> getStringArrayPref(Context context, String key) {
+        String json = SharedPreferencesSingleton.instance(context).getString(key, null);
         ArrayList<String> answers = null;
         if (json != null) {
-            answers = new ArrayList<String>();
+            answers = new ArrayList<>();
             try {
                 JSONArray array = new JSONArray(json);
                 for (int i = 0; i < array.length(); i++) {
@@ -621,8 +590,8 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * Display an application-wide toast message, with long timeout
      * @param messageId resource id of string to display
      */
-    public static void showLongToast(int messageId) {
-    	showLongToast(app.getString(messageId));
+    public static void showLongToast(Context context, int messageId) {
+    	showLongToast(context.getString(messageId));
     }
     
     /**
@@ -630,41 +599,52 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * updated time and send broadcast to any receivers that there is a new
      * setlist to show.
      */
-    public static void getSetlist() {
-        ParseQuery<ParseObject> setlistQuery = new ParseQuery<ParseObject>("Setlist");
-        setlistQuery.addDescendingOrder("setDate");
-        setlistQuery.setLimit(1);
-        //setlistQuery.setSkip(5);
-        setlistQuery.findInBackground(new FindCallback<ParseObject>() {
+    public static void getSetlist(final Context context) {
+        QueryOptions queryOptions = new QueryOptions();
+        List<String> sortBy = new ArrayList<>();
+        sortBy.add("setDate DESC");
+        queryOptions.setSortBy(sortBy);
+        queryOptions.setPageSize(1);
+        queryOptions.setOffset(0);
+        BackendlessDataQuery query = new BackendlessDataQuery();
+        query.setQueryOptions(queryOptions);
+        Backendless.Persistence.of(Setlist.class).find(query,
+                new AsyncCallback<BackendlessCollection<Setlist>>() {
+
+            Intent intent = new Intent(Constants.ACTION_UPDATE_SETLIST);
+            String setlist;
+            String setStamp;
+
+            private void setlistWork(String setlist, String setStamp) {
+                Editor editor = SharedPreferencesSingleton.instance(context).edit();
+                editor.putString(ResourcesSingleton.instance(context).getString(
+                        R.string.setlist_key), setlist);
+                editor.putString(ResourcesSingleton.instance(context).getString(
+                        R.string.setstamp_key), setStamp);
+                Log.w(Constants.LOG_TAG, "updating setlist_key");
+                editor.apply();
+                parseSetlist(setlist);
+            }
+
             @Override
-            public void done(List<ParseObject> setlists, ParseException e) {
-            	String setlist = "Error downloading setlist";
-                Intent intent = new Intent(Constants.ACTION_UPDATE_SETLIST);
-                if (e != null) {
-                    Log.e(Constants.LOG_TAG, "Error getting setlist!", e);
-                    intent.putExtra("success", false);
-                }
-                else {
-                    setlist = setlists.get(0).getString("set");
-                    df.setTimeZone(TimeZone.getDefault());
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("Updated:\n");
-                    sb.append(DateFormat.format(df.toLocalizedPattern(), setlists.get(0).getUpdatedAt()));
-                    Editor editor = SharedPreferencesSingleton.instance()
-                    		.edit();
-                    editor.putString(ResourcesSingleton.instance().getString(
-                    		R.string.setlist_key), setlist);
-                    editor.putString(ResourcesSingleton.instance().getString(
-                    		R.string.setstamp_key), sb.toString());
-                    Log.w(Constants.LOG_TAG, "updating setlist_key");
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.GINGERBREAD)
-                    	editor.commit();
-                    else
-                    	editor.apply();
-                    parseSetlist(setlist);
-                    intent.putExtra("success", true);
-                }
-                app.sendBroadcast(intent);
+            public void handleResponse(BackendlessCollection<Setlist> setlists) {
+                setlist = setlists.getCurrentPage().get(0).getSet();
+                df.setTimeZone(TimeZone.getDefault());
+                setStamp = "Updated:\n" + DateFormat.format(df.toLocalizedPattern(),
+                        setlists.getCurrentPage().get(0).getUpdated());
+                setlistWork(setlist, setStamp);
+                intent.putExtra("success", true);
+                context.sendBroadcast(intent);
+            }
+
+            @Override
+            public void handleFault(BackendlessFault fault) {
+                Log.e(Constants.LOG_TAG, "Error getting setlist!");
+                setlist = "Error downloading setlist";
+                setStamp = "";
+                setlistWork(setlist, setStamp);
+                intent.putExtra("success", false);
+                context.sendBroadcast(intent);
             }
         });
     }
@@ -674,40 +654,41 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * individual string
      */
     public static void parseSetlist(String setlist) {
-        setlistList = new ArrayList<String>(Arrays.asList(setlist.split("\n")));
+        setlistList = new ArrayList<>(Arrays.asList(setlist.split("\n")));
     }
     
     /**
      * Make the URI for the audio to add to the notification
      * @param soundId resource id of the audio
      */
-    public static void createNotificationUri(int soundId) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("android.resource://");
-        sb.append(app.getPackageName());
-        sb.append("/");
-        sb.append(soundId);
-        notificationSound = Uri.parse(sb.toString());
+    public static void createNotificationUri(Context context, int soundId) {
+        String string = "android.resource://"
+                .concat(context.getPackageName())
+                .concat("/")
+                .concat(Integer.toString(soundId));
+        notificationSound = Uri.parse(string);
     }
     
     /**
      * Make the URI for the audio to add to the notification
      * @param soundPath path of the audio
      */
-    public static void createNotificationUri(String soundPath) {
+    public static void createNotificationUri(Context context, String soundPath) {
     	File file = new File(soundPath);
-    	if (file.exists())
-    		notificationSound = Uri.parse(soundPath);
-    	else
-    		createNotificationUri(R.raw.general);
+    	if (file.exists()) {
+            notificationSound = Uri.parse(soundPath);
+        } else {
+            createNotificationUri(context, R.raw.general);
+        }
     }
     
     /**
      * Create the map that associates song titles to images and audio for the
      * notifications
+     * @param context
      */
-    private static void generateSongMap() {
-        songMap = new PatriciaTrie<String, SongInfo>(StringKeyAnalyzer.CHAR);
+    private static void generateSongMap(Context context) {
+        songMap = new PatriciaTrie<>(StringKeyAnalyzer.CHAR);
         
         songMap.put("belly belly nice", new SongInfo(R.drawable.away_from_the_world, R.raw.aftw));
         songMap.put("belly full", new SongInfo(R.drawable.away_from_the_world, R.raw.aftw));
@@ -852,22 +833,24 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         	String songFile = StringUtils.remove(
         			StringUtils.remove(
         					StringUtils.remove(songName, " "), "'"), "#");
-        	if (!DatabaseHelperSingleton.instance().hasNotificationSong(
-        			songFile))
-        		DatabaseHelperSingleton.instance().addNotification(songFile,
-        				info.getImage(), info.getAudio());
-        	else
-        		DatabaseHelperSingleton.instance().updateNotification(songFile,
-        				info.getImage(), info.getAudio());
+        	if (!DatabaseHelperSingleton.instance(context).hasNotificationSong(songFile)) {
+                DatabaseHelperSingleton.instance(context).addNotification(songFile, info.getImage(),
+                        info.getAudio());
+            } else {
+                DatabaseHelperSingleton.instance(context).updateNotification(songFile,
+                        info.getImage(), info.getAudio());
+            }
         }
     }
     
     /**
      * Get the image that matches the given song title for the notification
-     * @param songTitle	title of the song to match
+     *
+     * @param context
+     * @param songTitle    title of the song to match
      * @return id for the image resource that matches
      */
-    public static int findMatchingImage(String songTitle) {
+    public static int findMatchingImage(Context context, String songTitle) {
         songTitle = StringUtils.remove(songTitle, "*");
         songTitle = StringUtils.remove(songTitle, "+");
         songTitle = StringUtils.remove(songTitle, "~");
@@ -882,16 +865,15 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         songTitle = StringUtils.lowerCase(songTitle, Locale.ENGLISH);
         songTitle = StringUtils.remove(songTitle, " ");
     	songTitle = StringUtils.remove(songTitle, "'");
-        return DatabaseHelperSingleton.instance().getNotificationImage(
+        return DatabaseHelperSingleton.instance(context).getNotificationImage(
         		songTitle);
     }
     
     /**
      * Get the audio that matches the current song for the notification.
      * @param songTitle	title of song to match
-     * @return id for the audio that matches
      */
-    public static void findMatchingAudio(String songTitle) {
+    public static void findMatchingAudio(Context context, String songTitle) {
         songTitle = StringUtils.remove(songTitle, "*");
         songTitle = StringUtils.remove(songTitle, "+");
         songTitle = StringUtils.remove(songTitle, "~");
@@ -908,19 +890,16 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     	//songTitle = StringUtils.remove(songTitle, "'");
         Entry<String, SongInfo> entry = songMap.select(songTitle);
         Log.w(Constants.LOG_TAG, songTitle + " : " + entry.getKey());
-        switch (SharedPreferencesSingleton.instance().getInt(
-                ResourcesSingleton.instance().getString(
-                		R.string.notificationtype_key), 0)) {
+        switch (SharedPreferencesSingleton.instance(context).getInt(
+                ResourcesSingleton.instance(context).getString(R.string.notificationtype_key), 0)) {
         case 0:
-        	ApplicationEx.createNotificationUri(R.raw.general);
+        	ApplicationEx.createNotificationUri(context, R.raw.general);
         	break;
         case 1:
         	if (songTitle.startsWith(entry.getKey())) {
-        		ApplicationEx.createNotificationUri(
-        				entry.getValue().getAudio());
-        	}
-        	else {
-        		ApplicationEx.createNotificationUri(R.raw.general);
+        		ApplicationEx.createNotificationUri(context, entry.getValue().getAudio());
+        	} else {
+        		ApplicationEx.createNotificationUri(context, R.raw.general);
         	}
         	break;
         /*
@@ -937,7 +916,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         	break;
         */
     	default:
-    		ApplicationEx.createNotificationUri(R.raw.general);
+    		ApplicationEx.createNotificationUri(context, R.raw.general);
         	break;
         }
     }
@@ -950,7 +929,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      */
     @SuppressLint("InlinedApi")
 	public static Bitmap resizeImage(Resources res, int resId) {
-        Bitmap bitmap = null;
+        Bitmap bitmap;
         try {
         	bitmap = BitmapFactory.decodeResource(res, resId);
         } catch (OutOfMemoryError e) {
@@ -958,8 +937,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         }
         if (resId == R.drawable.notification_large)
             return bitmap;
-        double ratio = (double) ((double)bitmap.getHeight() / 
-                (double)bitmap.getWidth());
+        double ratio = (double)bitmap.getHeight() / (double)bitmap.getWidth();
         Bitmap smallBitmap;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
             smallBitmap = Bitmap.createScaledBitmap(bitmap,
@@ -987,8 +965,8 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * specific to the orientation.
      * @param backgroundDrawable	drawable for the current orientation
      */
-    public static void setBackgroundBitmap(Bitmap backgroundDrawable) {
-        switch(ResourcesSingleton.instance().getConfiguration().orientation) {
+    public static void setBackgroundBitmap(Context context, Bitmap backgroundDrawable) {
+        switch(ResourcesSingleton.instance(context).getConfiguration().orientation) {
         case Configuration.ORIENTATION_PORTRAIT:
             ApplicationEx.portraitBackgroundBitmap = backgroundDrawable;
             break;
@@ -1005,8 +983,8 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * portrait and landscape are held here to reduce work when rotating.
      * @return current drawable for the login, question and stats background
      */
-    public static Bitmap getBackgroundBitmap() {
-        switch(ResourcesSingleton.instance().getConfiguration().orientation) {
+    public static Bitmap getBackgroundBitmap(Context context) {
+        switch(ResourcesSingleton.instance(context).getConfiguration().orientation) {
         case Configuration.ORIENTATION_PORTRAIT:
             return ApplicationEx.portraitBackgroundBitmap;
         case Configuration.ORIENTATION_LANDSCAPE:
@@ -1021,8 +999,8 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * orientation.
      * @param setlistDrawable	drawable for the current orientation
      */
-    public static void setSetlistBitmap(Bitmap setlistDrawable) {
-        switch(ResourcesSingleton.instance().getConfiguration().orientation) {
+    public static void setSetlistBitmap(Context context, Bitmap setlistDrawable) {
+        switch(ResourcesSingleton.instance(context).getConfiguration().orientation) {
         case Configuration.ORIENTATION_PORTRAIT:
             ApplicationEx.portraitSetlistBitmap = setlistDrawable;
             break;
@@ -1039,8 +1017,8 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
      * are held here to reduce work when rotating.
      * @return current drawable for the setlist background
      */
-    public static Bitmap getSetlistBitmap() {
-        switch(ResourcesSingleton.instance().getConfiguration().orientation) {
+    public static Bitmap getSetlistBitmap(Context context) {
+        switch(ResourcesSingleton.instance(context).getConfiguration().orientation) {
         case Configuration.ORIENTATION_PORTRAIT:
             return ApplicationEx.portraitSetlistBitmap;
         case Configuration.ORIENTATION_LANDSCAPE:
@@ -1053,11 +1031,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     public static void downloadSongClips(List<String> songs) {
     	isDownloading = true;
     	SongDownloadTask songDownloadTask = new SongDownloadTask(songs);
-    	if (Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.HONEYCOMB)
-        	songDownloadTask.execute();
-        else
-        	songDownloadTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        songDownloadTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
     
     private static class SongDownloadTask extends AsyncTask<Void, Void, Void> {
@@ -1069,16 +1043,18 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     	
     	@Override
         protected Void doInBackground(Void... nothing) {
-    		FileOutputStream fout = null;
-            File audioFile = null;
+            // TODO Convert to Backendless if needed
+            /**
+    		FileOutputStream fout;
+            File audioFile;
             StringBuilder sb = new StringBuilder();
-    		ParseFile file = null;
+    		ParseFile file;
     		ParseQuery<ParseObject> query = new ParseQuery<ParseObject>("Audio");
     		if (songs != null)
     			query.whereContainedIn("name", songs);
     		try {
 				List<ParseObject> audioList = query.find();
-				String name = "";
+				String name;
 				for (ParseObject audio : audioList) {
 					name = audio.getString("name");
 					DatabaseHelperSingleton.instance()
@@ -1116,6 +1092,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
 				Log.e(Constants.LOG_TAG, "Couldn't find audio!", e);
 			}
     		isDownloading = false;
+             */
     		return null;
     	}
     }

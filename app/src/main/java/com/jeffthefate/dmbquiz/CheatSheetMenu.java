@@ -43,7 +43,7 @@ public class CheatSheetMenu {
      */
     public static void setup(View view, final int textResId, int width,
     		int height, int location) {
-    	showCheatSheet(view, ApplicationEx.getApp().getString(textResId),
+    	showCheatSheet(view, view.getContext().getString(textResId),
     			width, height, location);
     }
 
@@ -71,7 +71,7 @@ public class CheatSheetMenu {
         }
         TextView toolTipText = (TextView) view.findViewById(R.id.ToolTipText);
         toolTipText.setText(text);
-        Toast cheatSheet = new Toast(ApplicationEx.getApp());
+        Toast cheatSheet = new Toast(view.getContext());
         cheatSheet.setDuration(Toast.LENGTH_LONG);
         switch (location) {
         case Constants.QUICK_TIP_TOP:

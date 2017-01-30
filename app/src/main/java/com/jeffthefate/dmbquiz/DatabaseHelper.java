@@ -189,9 +189,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     
     private static DatabaseHelper instance;
     
-    public static synchronized DatabaseHelper getInstance() {
-        if (instance == null)
-            instance = new DatabaseHelper(ApplicationEx.getApp());
+    public static synchronized DatabaseHelper getInstance(Context context) {
+        if (instance == null) {
+            instance = new DatabaseHelper(context);
+        }
         return instance;
     }
     
@@ -266,7 +267,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     
     public void addUser(BackendlessUser user, String type) {
         ContentValues cv = new ContentValues();
-        cv.put(COL_USER_ID, user.getObjectId());
+        cv.put(COL_USER_ID, (String) user.getProperty("username"));
         cv.put(COL_USER_TYPE, type);
         cv.put(COL_SCORE, (String) user.getProperty("score"));
         cv.put(COL_OFFSET, 1);

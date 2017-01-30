@@ -101,10 +101,10 @@ public class FragmentChooser extends FragmentBase {
                 if (mCallback != null) {
                     if (ApplicationEx.hasConnection()) {
                         mCallback.setNetworkProblem(false);
-                        ApplicationEx.getSetlist();
+                        ApplicationEx.getSetlist(getActivity());
                     }
                     else {
-                        ApplicationEx.showLongToast(R.string.NoConnectionToast);
+                        ApplicationEx.showLongToast(getActivity(), R.string.NoConnectionToast);
                         showNetworkProblem();
                     }
                 }
@@ -131,7 +131,7 @@ public class FragmentChooser extends FragmentBase {
             }
         }
         else {
-    		ApplicationEx.getSetlist();
+    		ApplicationEx.getSetlist(getActivity());
         }
     }
     
@@ -151,7 +151,7 @@ public class FragmentChooser extends FragmentBase {
     @Override
     public void disableButton(boolean isRetry) {
         retryButton.setBackgroundResource(R.drawable.button_disabled);
-        retryButton.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+        retryButton.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
         retryButton.setEnabled(false);
     }
     

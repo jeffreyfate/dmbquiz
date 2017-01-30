@@ -1,16 +1,21 @@
 package com.jeffthefate.dmbquiz.fragment;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 
 import org.apache.commons.lang3.StringUtils;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.widget.SwipeRefreshLayout;
+import android.text.format.DateFormat;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -24,6 +29,13 @@ import android.widget.RelativeLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.backendless.Backendless;
+import com.backendless.BackendlessCollection;
+import com.backendless.async.callback.AsyncCallback;
+import com.backendless.exceptions.BackendlessException;
+import com.backendless.exceptions.BackendlessFault;
+import com.backendless.persistence.BackendlessDataQuery;
+import com.backendless.persistence.QueryOptions;
 import com.google.android.gms.analytics.HitBuilders;
 import com.jeffthefate.dmbquiz.ApplicationEx;
 import com.jeffthefate.dmbquiz.ApplicationEx.ResourcesSingleton;
@@ -34,9 +46,7 @@ import com.jeffthefate.dmbquiz.ImageViewEx;
 import com.jeffthefate.dmbquiz.OnButtonListener;
 import com.jeffthefate.dmbquiz.R;
 import com.jeffthefate.dmbquiz.SetInfo;
-import com.parse.ParseException;
-import com.parse.ParseObject;
-import com.parse.ParseQuery;
+import com.jeffthefate.dmbquiz.Setlist;
 
 public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.OnRefreshListener {
     
@@ -141,7 +151,7 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
         });
         */
 		background = (ImageViewEx) v.findViewById(R.id.Background);
-		mCallback.setlistBackground(ResourcesSingleton.instance()
+		mCallback.setlistBackground(ResourcesSingleton.instance(getActivity())
 				.getResourceEntryName(R.drawable.setlist), background);
 		/*
 		try {
@@ -165,10 +175,10 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
                 if (mCallback != null) {
                     if (ApplicationEx.hasConnection()) {
                         mCallback.setNetworkProblem(false);
-                        ApplicationEx.getSetlist();
+                        ApplicationEx.getSetlist(getActivity());
                     }
                     else {
-                        ApplicationEx.showLongToast(R.string.NoConnectionToast);
+                        ApplicationEx.showLongToast(getActivity(), R.string.NoConnectionToast);
                         showNetworkProblem();
                     }
                 }
@@ -200,11 +210,11 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
 		        }
 	        }
 	        else {
-	    		ApplicationEx.getSetlist();
+	    		ApplicationEx.getSetlist(getActivity());
 	        }
         }
         else {
-        	ApplicationEx.showLongToast(R.string.NoConnectionToast);
+        	ApplicationEx.showLongToast(getActivity(), R.string.NoConnectionToast);
             showNetworkProblem();
         }
         /*
@@ -287,7 +297,7 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
     @Override
     public void disableButton(boolean isRetry) {
         retryButton.setBackgroundResource(R.drawable.button_disabled);
-        retryButton.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+        retryButton.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
         retryButton.setEnabled(false);
     }
     
@@ -346,28 +356,30 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
 
 	@Override
 	public void onRefresh() {
-		if (Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.HONEYCOMB) {
-        	new UpdateSetlistTask().execute();
-    	}
-        else {
-        	new UpdateSetlistTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-        }
+        new UpdateSetlistTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 	}
 	
 	private class UpdateSetlistTask extends AsyncTask<Void, Void, String> {
     	
         @Override
         protected String doInBackground(Void... nothing) {
-        	ParseQuery<ParseObject> setlistQuery = new ParseQuery<ParseObject>("Setlist");
-            setlistQuery.addDescendingOrder("setDate");
-            setlistQuery.setLimit(1);
+			QueryOptions queryOptions = new QueryOptions();
+			List<String> sortBy = new ArrayList<>();
+			sortBy.add("setDate DESC");
+			queryOptions.setSortBy(sortBy);
+			queryOptions.setPageSize(1);
+			queryOptions.setOffset(0);
+			BackendlessDataQuery query = new BackendlessDataQuery();
+			query.setQueryOptions(queryOptions);
             try {
-				List<ParseObject> setlists = setlistQuery.find();
-				return setlists.get(0).getString("set");
-			} catch (ParseException e) {
-				ApplicationEx.showShortToast("Refresh failed");
-			}
+                BackendlessCollection<Setlist> setlistCollection = Backendless.Persistence.of(Setlist.class).find(query);
+                List<Setlist> setlists = setlistCollection.getCurrentPage();
+                if (!setlists.isEmpty()) {
+                    return setlists.get(0).getSet();
+                }
+            } catch (BackendlessException e) {
+                ApplicationEx.showShortToast("Refresh failed");
+            }
             return null;
         }
         
@@ -384,12 +396,9 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
         	setlistSwipe.setRefreshing(false);
         	if (setlist != null) {
         		setSetlistText(setlist, true);
-        		String timestamp = ApplicationEx.getUpdatedDateString(
-                		System.currentTimeMillis());
-        		SharedPreferencesSingleton.putString(R.string.setlist_key,
-        				setlist);
-        		SharedPreferencesSingleton.putString(R.string.setstamp_key,
-        				timestamp);
+        		String timestamp = ApplicationEx.getUpdatedDateString(System.currentTimeMillis());
+        		SharedPreferencesSingleton.putString(R.string.setlist_key, setlist);
+        		SharedPreferencesSingleton.putString(R.string.setstamp_key, timestamp);
         	}
         }
     }

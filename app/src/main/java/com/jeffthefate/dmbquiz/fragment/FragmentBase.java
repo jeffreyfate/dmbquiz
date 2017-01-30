@@ -1,18 +1,8 @@
 package com.jeffthefate.dmbquiz.fragment;
 
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.TreeMap;
-
-import org.apache.commons.lang3.StringUtils;
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
@@ -23,11 +13,7 @@ import android.media.AudioManager.OnAudioFocusChangeListener;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
 import android.media.MediaPlayer.OnErrorListener;
-import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
-import android.os.PowerManager.WakeLock;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 
@@ -42,6 +28,13 @@ import com.jeffthefate.dmbquiz.ImageViewEx;
 import com.jeffthefate.dmbquiz.OnButtonListener;
 import com.jeffthefate.dmbquiz.R;
 import com.jeffthefate.dmbquiz.activity.ActivityMain.UiCallback;
+
+import org.apache.commons.lang3.StringUtils;
+
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.TreeMap;
 //import android.graphics.drawable.TransitionDrawable;
 
 public class FragmentBase extends Fragment implements UiCallback {
@@ -91,24 +84,22 @@ public class FragmentBase extends Fragment implements UiCallback {
         fields = R.raw.class.getFields();
         String fieldName;
         try {
-        	for (int i = 0; i < fields.length; i++) {
-        		fieldName = fields[i].getName();
+        	for (Field field : fields) {
+        		fieldName = field.getName();
         		if (fieldName.startsWith("correct"))
-        			correctAudio.add(fields[i].getInt(null));
+        			correctAudio.add(field.getInt(null));
         		else if (fieldName.startsWith("wrong"))
-        			wrongAudio.add(fields[i].getInt(null));
+        			wrongAudio.add(field.getInt(null));
         		else if (fieldName.startsWith("hint"))
-        			hintAudio.add(fields[i].getInt(null));
+        			hintAudio.add(field.getInt(null));
         		else if (fieldName.startsWith("skip"))
-        			skipAudio.add(fields[i].getInt(null));
+        			skipAudio.add(field.getInt(null));
         	}
         	audioMap.put("correct", correctAudio);
         	audioMap.put("wrong", wrongAudio);
         	audioMap.put("hint", hintAudio);
         	audioMap.put("skip", skipAudio);
-        } catch (IllegalArgumentException e) {
-			Log.e(Constants.LOG_TAG, "Unable to get audio reference!", e);
-		} catch (IllegalAccessException e) {
+        } catch (IllegalArgumentException|IllegalAccessException e) {
 			Log.e(Constants.LOG_TAG, "Unable to get audio reference!", e);
 		}
     }
@@ -117,15 +108,13 @@ public class FragmentBase extends Fragment implements UiCallback {
     	fields = R.raw.class.getFields();
         String fieldName;
         try {
-        	for (int i = 0; i < fields.length; i++) {
-        		fieldName = fields[i].getName();
+        	for (Field field : fields) {
+        		fieldName = field.getName();
         		if (fieldName.startsWith(type))
-        			audioMap.get(type).add(fields[i].getInt(null));
+        			audioMap.get(type).add(field.getInt(null));
         	}
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException|IllegalAccessException e) {
         	Log.e(Constants.LOG_TAG, "Unable to get audio reference!", e);
-		} catch (IllegalAccessException e) {
-			Log.e(Constants.LOG_TAG, "Unable to get audio reference!", e);
 		}
     }
     
@@ -175,8 +164,7 @@ public class FragmentBase extends Fragment implements UiCallback {
     
     public void updateSetText() {
     	if (mCallback.getSelectedSetInfo() == null ||
-    			StringUtils.isBlank(
-    					mCallback.getSelectedSetInfo().getSetlist())) {
+                StringUtils.isBlank(mCallback.getSelectedSetInfo().getSetlist())) {
     		mCallback.readSetlistInfoFromDatabase();
     	}
     }
@@ -210,7 +198,7 @@ public class FragmentBase extends Fragment implements UiCallback {
         }
     };
 
-    public void getAudioFocus(int resource) {
+    public void getAudioFocus(Context context, int resource) {
         audioManager.abandonAudioFocus(afChangeListener);
         int result = audioManager.requestAudioFocus(afChangeListener, 
                 AudioManager.STREAM_MUSIC,
@@ -224,8 +212,7 @@ public class FragmentBase extends Fragment implements UiCallback {
                     mediaPlayer.release();
                     mediaPlayer = null;
                 }
-                mediaPlayer = MediaPlayer.create(ApplicationEx.getApp(),
-                        resource);
+                mediaPlayer = MediaPlayer.create(context, resource);
                 mediaPlayer.start();
                 mediaPlayer.setOnCompletionListener(new OnCompletionListener() {
                     @Override
@@ -241,25 +228,24 @@ public class FragmentBase extends Fragment implements UiCallback {
                         try {
 	                        mp.reset();
 	                        mp.release();
-                        } catch (IllegalStateException e) {
-                        } catch (NullPointerException e) {}
+                        } catch (IllegalStateException|NullPointerException e) {}
                         return true;
                     } 
                 });
-            } catch (IllegalStateException e) {
-            } catch (NullPointerException e) {}
+            } catch (IllegalStateException|NullPointerException e) {}
         }
     }
     
     /*
      * Play audio for correct/wrong/skip/hint if sound is enabled
      */
-    protected void playAudio(String type) {
+    protected void playAudio(Context context, String type) {
     	ArrayList<Integer> tempList = audioMap.get(type);
-    	if (tempList.isEmpty())
-    		resetAudio(type);
+    	if (tempList.isEmpty()) {
+            resetAudio(type);
+        }
     	int random = (int) (Math.random()*tempList.size());
-    	currentAudio = tempList.remove(random);
+    	int currentAudio = tempList.remove(random);
     	/*
         do {
             rawIndex = (int) (Math.random()*fields.length);
@@ -273,10 +259,10 @@ public class FragmentBase extends Fragment implements UiCallback {
         	e1.printStackTrace();
     	}
     	*/
-        if (SharedPreferencesSingleton.instance().getBoolean(
-                		ResourcesSingleton.instance().getString(
-                				R.string.sound_key), false))
-            getAudioFocus(currentAudio);
+        if (SharedPreferencesSingleton.instance(context).getBoolean(
+                ResourcesSingleton.instance(context).getString(R.string.sound_key), false)) {
+            getAudioFocus(context, currentAudio);
+        }
     }
     
     private Field[] fields;
@@ -287,7 +273,6 @@ public class FragmentBase extends Fragment implements UiCallback {
     private HashMap<String, ArrayList<Integer>> audioMap =
     		new HashMap<String, ArrayList<Integer>>();
     //private int rawIndex = -1;
-    private int currentAudio;
     
     private MediaPlayer mediaPlayer;
     private AudioManager audioManager;
@@ -302,8 +287,8 @@ public class FragmentBase extends Fragment implements UiCallback {
         super.onPause();
     }
     
-    protected void setBackgroundBitmap(String name, String screen) {
-        Bitmap backgroundBitmap = ApplicationEx.getBackgroundBitmap();
+    protected void setBackgroundBitmap(Context context, String name, String screen) {
+        Bitmap backgroundBitmap = ApplicationEx.getBackgroundBitmap(context);
         // TODO Do something better than this to apply the correct background
         // mCallback.setCurrFrag(this);
         Log.w(Constants.LOG_TAG, "setBackgroundBitmap");
@@ -326,9 +311,9 @@ public class FragmentBase extends Fragment implements UiCallback {
         	    success = mCallback.setBackground(name, false, screen);
         	}
         	if (!success) {
-        		int resourceId = ResourcesSingleton.instance().getIdentifier(
+        		int resourceId = ResourcesSingleton.instance(context).getIdentifier(
         				name, "drawable", getActivity().getPackageName());
-        		setBackground(mCallback.getBitmap(resourceId));
+        		setBackground(context, mCallback.getBitmap(resourceId));
         	}
         }
         else {
@@ -351,11 +336,11 @@ public class FragmentBase extends Fragment implements UiCallback {
                 */
             	background.setImageDrawable(null);
             	BitmapDrawable bitmapDrawable = new BitmapDrawable(
-            			ResourcesSingleton.instance(), backgroundBitmap);
+            			ResourcesSingleton.instance(context), backgroundBitmap);
             	if (screen.equalsIgnoreCase("info") ||
             			screen.equalsIgnoreCase("leaders")) {
             		bitmapDrawable.setColorFilter(new PorterDuffColorFilter(
-                			ResourcesSingleton.instance().getColor(
+                			ResourcesSingleton.instance(context).getColor(
                 					R.color.background_dark),
         					PorterDuff.Mode.SRC_ATOP));
             	}
@@ -368,26 +353,26 @@ public class FragmentBase extends Fragment implements UiCallback {
     }
     
     @SuppressLint("NewApi")
-	public void toggleSounds() {
+	public void toggleSounds(Context context) {
     	SharedPreferencesSingleton.putBoolean(R.string.sound_key,
-    			!SharedPreferencesSingleton.instance().getBoolean(
-						ResourcesSingleton.instance().getString(
+    			!SharedPreferencesSingleton.instance(context).getBoolean(
+						ResourcesSingleton.instance(context).getString(
 								R.string.sound_key), true));
     }
     
     @SuppressLint("NewApi")
-	public void toggleNotifications() {
+	public void toggleNotifications(Context context) {
     	SharedPreferencesSingleton.putBoolean(R.string.notification_key,
-    			!SharedPreferencesSingleton.instance().getBoolean(
-						ResourcesSingleton.instance().getString(
+    			!SharedPreferencesSingleton.instance(context).getBoolean(
+						ResourcesSingleton.instance(context).getString(
 								R.string.notification_key), true));
     }
     
     @SuppressLint("NewApi")
-	public void toggleTips() {
+	public void toggleTips(Context context) {
     	SharedPreferencesSingleton.putBoolean(R.string.quicktip_key,
-    			!SharedPreferencesSingleton.instance().getBoolean(
-						ResourcesSingleton.instance().getString(
+    			!SharedPreferencesSingleton.instance(context).getBoolean(
+						ResourcesSingleton.instance(context).getString(
 								R.string.quicktip_key), true));
     }
     
@@ -398,13 +383,14 @@ public class FragmentBase extends Fragment implements UiCallback {
     }
     
     public void changeName() {
-    	if (mCallback != null)
+    	if (mCallback != null) {
             mCallback.showNameDialog();
+        }
     }
     
     public void logOut() {
     	if (mCallback != null) {
-            DatabaseHelperSingleton.instance().setOffset(0, mCallback.getUserId());
+            DatabaseHelperSingleton.instance(getActivity()).setOffset(0, mCallback.getUserId());
             mCallback.setLoggingOut(true);
             mCallback.clearQuestionIds();
             mCallback.clearQuestions();
@@ -451,11 +437,11 @@ public class FragmentBase extends Fragment implements UiCallback {
     }
     */
     @Override
-    public void setBackground(Bitmap newBackground) {
+    public void setBackground(Context context, Bitmap newBackground) {
         if (background != null && newBackground != null) {
         	background.setImageDrawable(null);
         	BitmapDrawable bitmapDrawable = new BitmapDrawable(
-        			ResourcesSingleton.instance(), newBackground);
+        			ResourcesSingleton.instance(context), newBackground);
         	bitmapDrawable.setColorFilter(null);
             background.setImageDrawable(bitmapDrawable);
         }
@@ -463,10 +449,11 @@ public class FragmentBase extends Fragment implements UiCallback {
 	
 	@Override
 	public Drawable getBackground() {
-		if (background == null)
-    		return null;
-    	else
-    		return background.getDrawable();
+		if (background == null) {
+            return null;
+        } else {
+            return background.getDrawable();
+        }
 	}
 
     @Override

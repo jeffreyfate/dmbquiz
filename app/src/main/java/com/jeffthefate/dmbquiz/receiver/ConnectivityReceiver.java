@@ -21,7 +21,7 @@ public class ConnectivityReceiver extends BroadcastReceiver {
     @SuppressWarnings("deprecation")
 	@Override
     public void onReceive(Context context, Intent intent) {
-        connMan = (ConnectivityManager) ApplicationEx.getApp()
+        connMan = (ConnectivityManager) context
                 .getSystemService(Context.CONNECTIVITY_SERVICE);
         if (intent.getAction().equalsIgnoreCase(
                 ConnectivityManager.CONNECTIVITY_ACTION)) {
@@ -31,7 +31,7 @@ public class ConnectivityReceiver extends BroadcastReceiver {
                         ConnectivityManager.EXTRA_NO_CONNECTIVITY, false));
                 ApplicationEx.setConnection(!intent.getBooleanExtra(
                         ConnectivityManager.EXTRA_NO_CONNECTIVITY, false));
-                ApplicationEx.getApp().sendBroadcast(i);
+                context.sendBroadcast(i);
             }
             else if (intent.hasExtra(ConnectivityManager.EXTRA_NETWORK_INFO)) {
                 NetworkInfo nInfo = connMan.getActiveNetworkInfo();
@@ -40,7 +40,7 @@ public class ConnectivityReceiver extends BroadcastReceiver {
                         nInfo == null ? false : nInfo.isConnected());
                 ApplicationEx.setConnection(
                         nInfo == null ? false : nInfo.isConnected());
-                ApplicationEx.getApp().sendBroadcast(i);
+                context.sendBroadcast(i);
                 /*
                 if (nInfo != null && nInfo.isConnected() &&
                 		SharedPreferencesSingleton.instance().getInt(

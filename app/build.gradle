@@ -21,7 +21,7 @@ dependencies {
     compile project(':viewpagerindicator')
     compile project(':slidingmenu')
     compile 'com.facebook.android:facebook-android-sdk:4.+'
-    compile 'com.backendless:android:3.0.+'
+    compile 'com.backendless:backendless:3.0.24'
 }
 
 /**

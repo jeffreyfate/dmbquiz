@@ -25,7 +25,6 @@ import android.widget.Scroller;
 import com.google.android.gms.analytics.HitBuilders;
 import com.jeffthefate.dmbquiz.ApplicationEx.DatabaseHelperSingleton;
 import com.jeffthefate.dmbquiz.DatabaseHelper;
-import com.jeffthefate.dmbquiz.OnButtonListener;
 import com.jeffthefate.dmbquiz.R;
 import com.jeffthefate.dmbquiz.activity.ActivityMain;
 import com.jeremyfeinstein.slidingmenu.lib.SlidingMenu;
@@ -53,11 +52,11 @@ public class FragmentPager extends FragmentBase {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        userId = DatabaseHelperSingleton.instance().getCurrUser();
+        userId = DatabaseHelperSingleton.instance(getActivity()).getCurrUser();
         if (userId != null) {
-            loggedIn = DatabaseHelperSingleton.instance().getUserIntValue(
+            loggedIn = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
                     DatabaseHelper.COL_LOGGED_IN, userId) == 1 ? true : false;
-            inStats = DatabaseHelperSingleton.instance().getUserIntValue(
+            inStats = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
                     DatabaseHelper.COL_IN_STATS, userId) == 1 ? true : false;
         }
         fragment = getFragmentForPager();
@@ -198,9 +197,9 @@ public class FragmentPager extends FragmentBase {
     }
     */
     @Override
-    public void setBackground(Bitmap background) {
+    public void setBackground(Context context, Bitmap background) {
         ((PagerAdapter) viewPager.getAdapter()).getFragmentList()
-                .get(0).setBackground(background);
+                .get(0).setBackground(context, background);
     }
     
     @Override

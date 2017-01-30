@@ -19,6 +19,12 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.TextView.OnEditorActionListener;
 
+import com.backendless.Backendless;
+import com.backendless.BackendlessCollection;
+import com.backendless.BackendlessUser;
+import com.backendless.async.callback.AsyncCallback;
+import com.backendless.exceptions.BackendlessFault;
+import com.backendless.persistence.BackendlessDataQuery;
 import com.google.android.gms.analytics.HitBuilders;
 import com.jeffthefate.dmbquiz.ApplicationEx;
 import com.jeffthefate.dmbquiz.ApplicationEx.ResourcesSingleton;
@@ -26,11 +32,6 @@ import com.jeffthefate.dmbquiz.ApplicationEx.SharedPreferencesSingleton;
 import com.jeffthefate.dmbquiz.Constants;
 import com.jeffthefate.dmbquiz.ImageViewEx;
 import com.jeffthefate.dmbquiz.R;
-import com.parse.FindCallback;
-import com.parse.ParseException;
-import com.parse.ParseObject;
-import com.parse.ParseQuery;
-import com.parse.ParseUser;
 
 public class FragmentSplash extends FragmentBase {
     
@@ -64,10 +65,9 @@ public class FragmentSplash extends FragmentBase {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (!SharedPreferencesSingleton.instance().contains(
-        		ResourcesSingleton.instance().getString(R.string.notification_key))) {
-        	SharedPreferencesSingleton.putBoolean(R.string.notification_key,
-        			true);
+        if (!SharedPreferencesSingleton.instance(getActivity()).contains(
+        		ResourcesSingleton.instance(getActivity()).getString(R.string.notification_key))) {
+        	SharedPreferencesSingleton.putBoolean(R.string.notification_key, true);
         }
     }
 
@@ -77,7 +77,7 @@ public class FragmentSplash extends FragmentBase {
     	super.onCreateView(inflater, container, savedInstanceState);
         View v = inflater.inflate(R.layout.splash, container, false);
         background = (ImageViewEx) v.findViewById(R.id.Background);
-        setBackgroundBitmap(mCallback.getBackground(), "splash");
+        setBackgroundBitmap(getActivity(), mCallback.getBackground(), "splash");
         loginUsername = (EditText) v.findViewById(R.id.LoginUsername);
         loginUsername.setOnEditorActionListener(new OnEditorActionListener() {
             @Override
@@ -298,29 +298,34 @@ public class FragmentSplash extends FragmentBase {
     }
     
     private void checkSignedUp(String username) {
-        ParseQuery<ParseUser> query = ParseUser.getQuery();
-        query.whereEqualTo("username", username);
-        query.findInBackground(new FindCallback<ParseUser>() {
+        BackendlessDataQuery query = new BackendlessDataQuery();
+        query.setWhereClause("username = '" + username + "'");
+        Backendless.Persistence.find(BackendlessUser.class, query,
+                new AsyncCallback<BackendlessCollection<BackendlessUser>>() {
             @Override
-            public void done(List<ParseUser> userList,
-                    ParseException e) {
-                if (e == null) {
-                    if (emailButtonLayout != null)
-                        emailButtonLayout.setVisibility(View.VISIBLE);
-                    if (userList.isEmpty()) {
-                        loginButton.setVisibility(View.GONE);
-                        signupButton.setVisibility(View.VISIBLE);
-                        resetButton.setVisibility(View.GONE);
-                        isSignedUp = false;
-                    }
-                    else {
-                        signupButton.setVisibility(View.GONE);
-                        loginButton.setVisibility(View.VISIBLE);
-                        resetButton.setVisibility(View.VISIBLE);
-                        isSignedUp = true;
-                    }
+            public void handleResponse(BackendlessCollection<BackendlessUser> userCollection) {
+                List<BackendlessUser> userList = userCollection.getCurrentPage();
+                if (emailButtonLayout != null) {
+                    emailButtonLayout.setVisibility(View.VISIBLE);
                 }
-            } 
+                if (userList.isEmpty()) {
+                    loginButton.setVisibility(View.GONE);
+                    signupButton.setVisibility(View.VISIBLE);
+                    resetButton.setVisibility(View.GONE);
+                    isSignedUp = false;
+                }
+                else {
+                    signupButton.setVisibility(View.GONE);
+                    loginButton.setVisibility(View.VISIBLE);
+                    resetButton.setVisibility(View.VISIBLE);
+                    isSignedUp = true;
+                }
+            }
+
+            @Override
+            public void handleFault(BackendlessFault fault) {
+                // TODO
+            }
         });
     }
     

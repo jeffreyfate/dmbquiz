@@ -67,7 +67,7 @@ public class ExceptionHandler {
 	
 	/**
 	 * Register handler for unhandled exceptions.
-	 * @param context
+	 * @param app
 	 */
 	public static boolean register(Application app) {
 	    mCallback = (OnStacktraceListener) app;

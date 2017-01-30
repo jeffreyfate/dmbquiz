@@ -42,7 +42,7 @@ public class FragmentLoad extends FragmentBase {
     	super.onCreateView(inflater, container, savedInstanceState);
         View view = inflater.inflate(R.layout.load, container, false);
         background = (ImageViewEx) view.findViewById(R.id.Background);
-        setBackgroundBitmap(mCallback.getBackground(), "load");
+        setBackgroundBitmap(getActivity(), mCallback.getBackground(), "load");
         progress = (ProgressBar) view.findViewById(R.id.Progress);
         networkText = (TextView) view.findViewById(R.id.NetworkText);
         loadingText = (TextView) view.findViewById(R.id.LoadingText);
@@ -64,7 +64,7 @@ public class FragmentLoad extends FragmentBase {
                         mCallback.onStatsPressed();
                     }
                     else {
-                    	ApplicationEx.showLongToast(R.string.NoConnectionToast);
+                    	ApplicationEx.showLongToast(getActivity(), R.string.NoConnectionToast);
                         showNetworkProblem();
                     }
                 }
@@ -85,7 +85,7 @@ public class FragmentLoad extends FragmentBase {
                 retryButton.setVisibility(View.INVISIBLE);
             }
             else {
-                ApplicationEx.showLongToast(R.string.NoConnectionToast);
+                ApplicationEx.showLongToast(getActivity(), R.string.NoConnectionToast);
                 showNetworkProblem();
             }
         }
@@ -117,7 +117,7 @@ public class FragmentLoad extends FragmentBase {
     public void disableButton(boolean isRetry) {
         if (isRetry) {
             retryButton.setBackgroundResource(R.drawable.button_disabled);
-            retryButton.setTextColor(ResourcesSingleton.instance().getColor(R.color.light_gray));
+            retryButton.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
             retryButton.setEnabled(false);
         }
     }

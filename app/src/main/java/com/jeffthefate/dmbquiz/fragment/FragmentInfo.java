@@ -1,6 +1,7 @@
 package com.jeffthefate.dmbquiz.fragment;
 
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
@@ -39,7 +40,7 @@ public class FragmentInfo extends FragmentBase {
     	super.onCreateView(inflater, container, savedInstanceState);
         View v = inflater.inflate(R.layout.info, container, false);
         background = (ImageViewEx) v.findViewById(R.id.Background);
-		setBackgroundBitmap(mCallback.getBackground(), "info");
+		setBackgroundBitmap(getActivity(), mCallback.getBackground(), "info");
         doneButton = (Button) v.findViewById(R.id.DoneButton);
         doneButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -64,13 +65,13 @@ public class FragmentInfo extends FragmentBase {
     }
     
     @Override
-    public void setBackground(Bitmap newBackground) {
+    public void setBackground(Context context, Bitmap newBackground) {
     	if (background != null && newBackground != null) {
         	background.setImageDrawable(null);
         	BitmapDrawable bitmapDrawable = new BitmapDrawable(
-        			ResourcesSingleton.instance(), newBackground);
+        			ResourcesSingleton.instance(context), newBackground);
         	bitmapDrawable.setColorFilter(new PorterDuffColorFilter(
-        			ResourcesSingleton.instance().getColor(
+        			ResourcesSingleton.instance(context).getColor(
         					R.color.background_dark),
 					PorterDuff.Mode.SRC_ATOP));
         	background.setImageDrawable(bitmapDrawable);

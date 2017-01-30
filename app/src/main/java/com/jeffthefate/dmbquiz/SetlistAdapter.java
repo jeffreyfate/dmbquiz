@@ -219,14 +219,14 @@ public class SetlistAdapter extends BaseExpandableListAdapter {
         holder.getSetText().setTag(childPosition);
         holder.getSetText().setText((CharSequence) getChild(groupPosition,
         		childPosition));
-        if (SharedPreferencesSingleton.instance().getInt(
-        		ResourcesSingleton.instance().getString(
+        if (SharedPreferencesSingleton.instance(context).getInt(
+        		ResourcesSingleton.instance(context).getString(
         				R.string.selected_group_key), -1) == groupPosition &&
-			SharedPreferencesSingleton.instance().getInt(
-	        		ResourcesSingleton.instance().getString(
+			SharedPreferencesSingleton.instance(context).getInt(
+	        		ResourcesSingleton.instance(context).getString(
 	        				R.string.selected_child_key), -1) == childPosition) {
         	convertView.setBackgroundColor(
-        			ResourcesSingleton.instance().getColor(color.orange));
+        			ResourcesSingleton.instance(context).getColor(color.orange));
         }
         else {
         	convertView.setBackgroundColor(Color.BLACK);

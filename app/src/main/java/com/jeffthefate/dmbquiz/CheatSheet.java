@@ -120,9 +120,9 @@ public class CheatSheet {
         final int viewWidth = view.getWidth();
         final int viewHeight = view.getHeight();
         final int viewCenterX = screenPos[0] + viewWidth / 2;
-        final int screenWidth = ResourcesSingleton.instance().getDisplayMetrics().widthPixels;
+        final int screenWidth = ResourcesSingleton.instance(view.getContext()).getDisplayMetrics().widthPixels;
         final int estimatedToastHeight = (int) (ESTIMATED_TOAST_HEIGHT_DIPS
-                * ResourcesSingleton.instance().getDisplayMetrics().density);
+                * ResourcesSingleton.instance(view.getContext()).getDisplayMetrics().density);
 
         Toast cheatSheet = Toast.makeText(context, text, Toast.LENGTH_SHORT);
         boolean showBelow = screenPos[1] < estimatedToastHeight;
