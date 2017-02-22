@@ -22,6 +22,9 @@ dependencies {
     compile project(':slidingmenu')
     compile 'com.facebook.android:facebook-android-sdk:4.+'
     compile 'com.backendless:backendless:3.0.24'
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile "com.android.support:support-fragment:25.1.0"
+    compile 'com.google.android.gms:play-services-analytics:10.0.1'
 }
 
 /**
@@ -144,11 +147,5 @@ android {
  * The dependencies block in the module-level build configuration file
  * only specifies dependencies required to build the module itself.
  */
-
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile "com.android.support:support-fragment:25.1.0"
-    compile 'com.google.android.gms:play-services-analytics:10.0.1'
-}
 
 apply plugin: 'com.google.gms.google-services'

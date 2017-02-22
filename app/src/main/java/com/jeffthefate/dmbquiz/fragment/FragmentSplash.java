@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -262,6 +263,7 @@ public class FragmentSplash extends FragmentBase {
     @Override
     public void onResume() {
     	super.onResume();
+        Log.i(Constants.LOG_TAG, "FragmentSplash onResume");
 	    /*
         showQuickTipMenu(quickTipLeftView, "Swipe from left for menu",
         		Constants.QUICK_TIP_LEFT);
@@ -296,8 +298,9 @@ public class FragmentSplash extends FragmentBase {
         else
             ApplicationEx.showLongToast("Enter valid email");
     }
-    
-    private void checkSignedUp(String username) {
+
+    // TODO Use AsyncTask instead
+    private void checkSignedUp(final String username) {
         BackendlessDataQuery query = new BackendlessDataQuery();
         query.setWhereClause("username = '" + username + "'");
         Backendless.Persistence.find(BackendlessUser.class, query,
@@ -319,6 +322,18 @@ public class FragmentSplash extends FragmentBase {
                     loginButton.setVisibility(View.VISIBLE);
                     resetButton.setVisibility(View.VISIBLE);
                     isSignedUp = true;
+                    userList.get(0).setEmail(username);
+                    Backendless.UserService.update(userList.get(0), new AsyncCallback<BackendlessUser>() {
+                        @Override
+                        public void handleResponse(BackendlessUser response) {
+                            Log.i(Constants.LOG_TAG, response.toString());
+                        }
+
+                        @Override
+                        public void handleFault(BackendlessFault fault) {
+                            Log.i(Constants.LOG_TAG, fault.toString());
+                        }
+                    });
                 }
             }
 

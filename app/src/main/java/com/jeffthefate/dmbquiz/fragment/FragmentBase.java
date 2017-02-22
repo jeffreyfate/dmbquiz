@@ -52,7 +52,7 @@ public class FragmentBase extends Fragment implements UiCallback {
     public static final int LOGIN_EMAIL = 4;
     
     @Override
-    public void onAttach(Activity activity) {
+    public void onAttach(Context activity) {
         super.onAttach(activity);
     	tracker = GoogleAnalytics.getInstance(activity).newTracker(R.xml.global_tracker);
         try {
@@ -79,8 +79,7 @@ public class FragmentBase extends Fragment implements UiCallback {
                         "hpTbnpuJ34zAFLnpOAXjH583rZGiYQVBWWvuXsTo");
         */
         setHasOptionsMenu(false);
-        audioManager = (AudioManager) getActivity().getSystemService(
-                Context.AUDIO_SERVICE);
+        audioManager = (AudioManager) getActivity().getSystemService(Context.AUDIO_SERVICE);
         fields = R.raw.class.getFields();
         String fieldName;
         try {
@@ -163,8 +162,8 @@ public class FragmentBase extends Fragment implements UiCallback {
     */
     
     public void updateSetText() {
-    	if (mCallback.getSelectedSetInfo() == null ||
-                StringUtils.isBlank(mCallback.getSelectedSetInfo().getSetlist())) {
+    	if (mCallback != null && (mCallback.getSelectedSetInfo() == null ||
+                StringUtils.isBlank(mCallback.getSelectedSetInfo().getSetlist()))) {
     		mCallback.readSetlistInfoFromDatabase();
     	}
     }

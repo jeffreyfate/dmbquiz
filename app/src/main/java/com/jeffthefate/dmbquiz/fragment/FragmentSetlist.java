@@ -72,8 +72,7 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
     }
     
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
     	super.onCreateView(inflater, container, savedInstanceState);
         View v = inflater.inflate(R.layout.setlist, container, false);
         setlistSwipe = (SwipeRefreshLayout) v.findViewById(R.id.SetlistSwipe);
@@ -82,19 +81,16 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
                 android.R.color.white, 
                 R.color.orange, 
                 android.R.color.white);
+        /**
         ViewTreeObserver vto = setlistSwipe.getViewTreeObserver();
         vto.addOnGlobalLayoutListener(new OnGlobalLayoutListener() {
             @Override
             public void onGlobalLayout() {
                 // Calculate the trigger distance.
-                final DisplayMetrics metrics = getResources()
-                		.getDisplayMetrics();
-                Float mDistanceToTriggerSync = 
-                		((View) setlistSwipe.getParent()).getHeight() * 0.6f;
+                Float mDistanceToTriggerSync = ((View) setlistSwipe.getParent()).getHeight() * 0.6f;
                 try {
                     // Set the internal trigger distance using reflection.
-                    Field field = SwipeRefreshLayout.class.getDeclaredField(
-                    		"mDistanceToTriggerSync");
+                    Field field = SwipeRefreshLayout.class.getDeclaredField("mDistanceToTriggerSync");
                     field.setAccessible(true);
                     field.setFloat(setlistSwipe, mDistanceToTriggerSync);
                 } catch (Exception e) {
@@ -103,13 +99,10 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
 
                 // Only needs to be done once so remove listener.
                 ViewTreeObserver obs = setlistSwipe.getViewTreeObserver();
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    obs.removeOnGlobalLayoutListener(this);
-                } else {
-                    obs.removeGlobalOnLayoutListener(this);
-                }
+                obs.removeOnGlobalLayoutListener(this);
             }
         });
+         */
         setlistScroll = (ScrollView) v.findViewById(R.id.SetlistScroll);
         setText = (TextView) v.findViewById(R.id.SetText);
         stampText = (TextView) v.findViewById(R.id.StampText);
@@ -193,7 +186,6 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
         super.onResume();
         if (ApplicationEx.hasConnection()) {
         	SetInfo selectedSetInfo = mCallback.getSelectedSetInfo();
-        	Log.i(Constants.LOG_TAG, "selectedSetInfo: " + selectedSetInfo);
 	        if (selectedSetInfo != null) {
 	            setText.setText(selectedSetInfo.getSetlist());
 	            if (setTextShot != null) {
@@ -260,7 +252,6 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
     @Override
     public void updateSetText() {
     	super.updateSetText();
-    	Log.i(Constants.LOG_TAG, "FragmentSetlist updateSetText: " + mCallback.getSelectedSetInfo().getSetlist());
     	if (retryButton != null && networkText != null && setText != null) {
     		retryButton.setVisibility(View.GONE);
 	        networkText.setVisibility(View.GONE);

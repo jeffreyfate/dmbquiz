@@ -20,6 +20,7 @@ import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import android.annotation.SuppressLint;
@@ -49,6 +50,7 @@ import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.text.format.DateFormat;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -56,6 +58,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.WindowManager;
 import android.widget.CheckedTextView;
 import android.widget.ExpandableListView;
 import android.widget.ProgressBar;
@@ -70,6 +73,7 @@ import com.backendless.exceptions.BackendlessException;
 import com.backendless.exceptions.BackendlessFault;
 import com.backendless.persistence.BackendlessDataQuery;
 import com.backendless.persistence.QueryOptions;
+import com.backendless.persistence.local.UserTokenStorageFactory;
 import com.facebook.CallbackManager;
 import com.google.android.gms.analytics.GoogleAnalytics;
 import com.google.android.gms.analytics.HitBuilders;
@@ -98,13 +102,13 @@ import com.jeffthefate.dmbquiz.fragment.FragmentLoad;
 import com.jeffthefate.dmbquiz.fragment.FragmentLogin;
 import com.jeffthefate.dmbquiz.fragment.FragmentNameDialog;
 import com.jeffthefate.dmbquiz.fragment.FragmentPager;
+import com.jeffthefate.dmbquiz.fragment.FragmentRetained;
 import com.jeffthefate.dmbquiz.fragment.FragmentScoreDialog;
 import com.jeffthefate.dmbquiz.fragment.FragmentSetlist;
 import com.jeremyfeinstein.slidingmenu.lib.SlidingMenu;
 import com.jeremyfeinstein.slidingmenu.lib.SlidingMenu.OnClosedListener;
 import com.jeremyfeinstein.slidingmenu.lib.app.SlidingFragmentActivity;
 
-// TODO Skip the login page
 /**
  // UserTokenStorageFactory is available in the com.backendless.persistence.local package
 
@@ -115,15 +119,14 @@ import com.jeremyfeinstein.slidingmenu.lib.app.SlidingFragmentActivity;
  */
 public class ActivityMain extends SlidingFragmentActivity implements
 		OnButtonListener {
+
+    private static final String TAG_RETAINED_FRAGMENT = "FragmentRetained";
 	
 	private SavedInstance savedInstance;
 
-	private BackendlessUser user;
-
-	private TextView noConnection;
-
 	private FragmentManager fMan;
 	private FragmentBase currFrag;
+    private FragmentRetained retainedFrag;
 
 	private ArrayList<Integer> fieldsList;
 
@@ -136,70 +139,60 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	private Bundle leadersBundle;
 
 	private UserTask userTask;
+    private LoginTask loginTask;
 
 	private boolean facebookLogin = false;
 
 	public interface UiCallback {
-		public void showNetworkProblem();
+		void showNetworkProblem();
 
-		public void showLoading(String message);
+		void showLoading(String message);
 
-		public void showNoMoreQuestions(int level);
+		void showNoMoreQuestions(int level);
 
-		public void resumeQuestion();
+		void resumeQuestion();
 
-		public void updateScoreText();
+		void updateScoreText();
 
-		public void resetHint();
+		void resetHint();
 
-		public void disableButton(boolean isRetry);
+		void disableButton(boolean isRetry);
 
-		public void enableButton(boolean isRetry);
+		void enableButton(boolean isRetry);
 
-		public void setDisplayName(String displayName);
+		void setDisplayName(String displayName);
 
-		public Drawable getBackground();
+		Drawable getBackground();
 
 		// public void setBackground(Bitmap background);
-		public void showRetry();
+		void showRetry();
 
-		public int getPage();
+		int getPage();
 
-		public void setPage(int page);
+		void setPage(int page);
 
-		public void setBackground(Context context, Bitmap newBackground);
+		void setBackground(Context context, Bitmap newBackground);
 
-		public void showResizedSetlist();
+		void showResizedSetlist();
 
-		public void hideResizedSetlist();
+		void hideResizedSetlist();
 
-		public void setSetlistText(String setlistText, boolean canRefresh);
+		void setSetlistText(String setlistText, boolean canRefresh);
 
-		public void setSetlistStampVisible(boolean isVisible);
+		void setSetlistStampVisible(boolean isVisible);
 
-		public void updateSetlistMap(
-				TreeMap<String, TreeMap<String, String>> setlistMap);
+		void updateSetlistMap(TreeMap<String, TreeMap<String, String>> setlistMap);
 	}
 
 	private NotificationManager nManager;
 
 	private ConnectionReceiver connReceiver;
 
-	private RelativeLayout statsButton;
 	private RelativeLayout switchButton;
-	private RelativeLayout infoButton;
-	private RelativeLayout reportButton;
-	private RelativeLayout shareButton;
-	private RelativeLayout nameButton;
-	private RelativeLayout exitButton;
-	private RelativeLayout logoutButton;
-	private TextView logoutText;
-	protected RelativeLayout levelButton;
+	// protected RelativeLayout levelButton;
 	protected ImageViewEx levelImage;
 	protected TextView levelText;
-	private RelativeLayout soundsButton;
 	private CheckedTextView soundsText;
-	private RelativeLayout notificationsButton;
 	private CheckedTextView notificationsText;
 	private RelativeLayout notificationSoundButton;
 	private TextView notificationSoundText;
@@ -208,18 +201,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	private TextView notificationAlbumText;
 	private ImageViewEx notificationAlbumImage;
 
-	private RelativeLayout followButton;
-	private RelativeLayout likeButton;
-
-	private RelativeLayout versionLayout;
-	private TextView versionText;
-
 	private boolean goToSetlist = false;
 
 	private Menu mMenu;
-
-	private MenuItem shareItem;
-	private MenuItem setlistItem;
 
 	private ScreenshotTask screenshotTask;
 	private LogoutWaitTask logoutWaitTask;
@@ -231,6 +215,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	private SetlistReceiver setlistReceiver;
 
     private CallbackManager callbackManager;
+
+    private int usableHeight;
 
 	/**
 	 * Activity lifecycle methods
@@ -244,7 +230,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		 * .permitDiskWrites() .build()); StrictMode.setVmPolicy(new
 		 * StrictMode.VmPolicy.Builder() .detectAll() .penaltyLog() .build());
 		 */
-		super.onCreate(null);
+		super.onCreate(savedInstanceState);
 		/*
 		 * Display display = getWindowManager().getDefaultDisplay(); if
 		 * (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB_MR2) { width =
@@ -253,6 +239,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		 * size.y; }
 		 */
 		setContentView(R.layout.main);
+
 		Field[] fields = R.drawable.class.getFields();
 		fieldsList = new ArrayList<>();
 		for (Field field : fields) {
@@ -265,7 +252,6 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			}
 		}
 		setlistReceiver = new SetlistReceiver();
-		noConnection = (TextView) findViewById(R.id.NoConnection);
 		/*
 		 * TEST Parse.initialize(this,
 		 * "6pJz1oVHAwZ7tfOuvHfQCRz6AVKZzg1itFVfzx2q",
@@ -287,46 +273,53 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		 */
 		// PushService.setDefaultPushCallback(this, ActivityMain.class);
 		fMan = getSupportFragmentManager();
-		if (savedInstanceState != null) {
-			savedInstance = (SavedInstance) savedInstanceState.getSerializable(
-					"savedInstance");
-			DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(
-					savedInstance.isNetworkProblem() ? 1 : 0,
-							DatabaseHelper.COL_NETWORK_PROBLEM,
-					savedInstance.getUserId());
+        retainedFrag = (FragmentRetained) fMan.findFragmentByTag(TAG_RETAINED_FRAGMENT);
+		if (retainedFrag != null) {
+			savedInstance = retainedFrag.getSavedInstance();
+            if (savedInstance == null) {
+                savedInstance = new SavedInstance();
+            }
+            DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(
+                    savedInstance.isNetworkProblem() ? 1 : 0, DatabaseHelper.COL_NETWORK_PROBLEM,
+                    savedInstance.getUserId());
 		} else {
+            retainedFrag = new FragmentRetained();
+            fMan.beginTransaction().add(retainedFrag, TAG_RETAINED_FRAGMENT).commit();
 			savedInstance = new SavedInstance();
-			savedInstance.setUserId(
-					DatabaseHelperSingleton.instance(getApplicationContext()).getCurrUser());
-			if (savedInstance.getUserId() != null) {
+			savedInstance.setUserId(DatabaseHelperSingleton.instance(getApplicationContext()).getUserId());
+			if (!savedInstance.getUserId().isEmpty()) {
 				getPersistedData(savedInstance.getUserId());
 			}
 		}
-		if (savedInstance.getUserId() == null) {
-			savedInstance.setUserId(
-					DatabaseHelperSingleton.instance(getApplicationContext()).getCurrUser());
-			if (savedInstance.getUserId() != null) {
+		if (savedInstance.getUserId().isEmpty()) {
+			savedInstance.setUserId(DatabaseHelperSingleton.instance(getApplicationContext()).getUserId());
+			if (!savedInstance.getUserId().isEmpty()) {
 				getUserData(savedInstance.getUserId());
 			}
 		}
-		if (savedInstance.getUserId() != null) {
-			if (savedInstance.getPortBackground() == null)
-				savedInstance.setPortBackground(
-						DatabaseHelperSingleton.instance(getApplicationContext()).getPortBackground(
-								savedInstance.getUserId()));
-			if (savedInstance.getLandBackground() == null)
-				savedInstance.setLandBackground(
-						DatabaseHelperSingleton.instance(getApplicationContext()).getLandBackground(
-								savedInstance.getUserId()));
+		if (!savedInstance.getUserId().isEmpty()) {
+            if (loginTask != null) {
+                loginTask.cancel(true);
+            }
+            loginTask = new LoginTask();
+            loginTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+			if (savedInstance.getPortBackground() == null) {
+                savedInstance.setPortBackground(
+                        DatabaseHelperSingleton.instance(getApplicationContext()).getPortBackground(
+                                savedInstance.getUserId()));
+            }
+			if (savedInstance.getLandBackground() == null) {
+                savedInstance.setLandBackground(
+                        DatabaseHelperSingleton.instance(getApplicationContext()).getLandBackground(
+                                savedInstance.getUserId()));
+            }
 		}
-		nManager = (NotificationManager) getSystemService(
-				Context.NOTIFICATION_SERVICE);
+		nManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 		connReceiver = new ConnectionReceiver();
 		getSlidingMenu().setShadowWidthRes(R.dimen.shadow_width);
 		getSlidingMenu().setFadeDegree(0.35f);
 		if (!SharedPreferencesSingleton.instance(getApplicationContext()).contains(
-				ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.notification_key))) {
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.notification_key))) {
 			SharedPreferencesSingleton.putBoolean(R.string.notification_key, true);
 		}
 		if (!SharedPreferencesSingleton.instance(getApplicationContext()).contains(
@@ -334,13 +327,11 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			SharedPreferencesSingleton.putInt(R.string.level_key, Constants.HARD);
 		}
 		if (!SharedPreferencesSingleton.instance(getApplicationContext()).contains(
-				ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.notificationsound_key))) {
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.notificationsound_key))) {
 			SharedPreferencesSingleton.putInt(R.string.notificationsound_key, 0);
 		}
 		if (!SharedPreferencesSingleton.instance(getApplicationContext()).contains(
-				ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.notificationtype_key))) {
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.notificationtype_key))) {
 			SharedPreferencesSingleton.putInt(R.string.notificationtype_key, 1);
 		}
 		refreshSlidingMenu();
@@ -352,91 +343,72 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	}
 
 	private void getPersistedData(String userId) {
-		savedInstance.setLoggedIn(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setLoggedIn(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_LOGGED_IN, userId) == 1);
-		savedInstance.setLogging(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setLogging(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_LOGGING, userId) == 1);
-		savedInstance.setInLoad(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setInLoad(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_IN_LOAD, userId) == 1);
-		savedInstance.setInStats(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setInStats(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_IN_STATS, userId) == 1);
-		savedInstance.setInInfo(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setInInfo(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_IN_INFO, userId) == 1);
-		savedInstance.setInFaq(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setInFaq(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_IN_FAQ, userId) == 1);
-		savedInstance.setInSetlist(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setInSetlist(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_IN_SETLIST, userId) == 1);
-		savedInstance.setInChooser(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setInChooser(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_IN_CHOOSER, userId) == 1);
 		getUserData(userId);
-		savedInstance.setNetworkProblem(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setNetworkProblem(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_NETWORK_PROBLEM, userId) == 1);
 	}
 
 	private void getUserData(String userId) {
+        Log.i(Constants.LOG_TAG, "getUserData: " + userId);
 		savedInstance.setPortBackground(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getPortBackground(userId));
+                DatabaseHelperSingleton.instance(getApplicationContext()).getPortBackground(userId));
 		savedInstance.setLandBackground(
 				DatabaseHelperSingleton.instance(getApplicationContext()).getLandBackground(userId));
-		savedInstance.setNewQuestion(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setNewQuestion(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_NEW_QUESTION, userId) == 1);
-		savedInstance.setDisplayName(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserStringValue(
+		savedInstance.setDisplayName(DatabaseHelperSingleton.instance(getApplicationContext()).getUserStringValue(
 				DatabaseHelper.COL_DISPLAY_NAME, userId));
-		savedInstance.setCurrScore(
-				DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
+		savedInstance.setCurrScore(DatabaseHelperSingleton.instance(getApplicationContext()).getUserIntValue(
 				DatabaseHelper.COL_SCORE, userId));
-		savedInstance.setQuestionHints(
-				ApplicationEx.getStringArrayPref(getApplicationContext(), ResourcesSingleton
-				.instance(getApplicationContext()).getString(R.string.questionhints_key)));
-		if (savedInstance.getQuestionHints() == null)
-			savedInstance.setQuestionHints(
-					new ArrayList<String>(Constants.CACHED_QUESTIONS));
-		savedInstance.setQuestionSkips(
-				ApplicationEx.getStringArrayPref(getApplicationContext(), ResourcesSingleton
-				.instance(getApplicationContext()).getString(R.string.questionskips_key)));
-		if (savedInstance.getQuestionSkips() == null)
-			savedInstance.setQuestionSkips(
-					new ArrayList<String>(Constants.CACHED_QUESTIONS));
+		savedInstance.setQuestionHints(ApplicationEx.getStringArrayPref(getApplicationContext(),
+                ResourcesSingleton.instance(getApplicationContext()).getString(R.string.questionhints_key)));
+		if (savedInstance.getQuestionHints() == null) {
+            savedInstance.setQuestionHints(new ArrayList<String>(Constants.CACHED_QUESTIONS));
+        }
+		savedInstance.setQuestionSkips(ApplicationEx.getStringArrayPref(getApplicationContext(),
+                ResourcesSingleton.instance(getApplicationContext()).getString(R.string.questionskips_key)));
+		if (savedInstance.getQuestionSkips() == null) {
+            savedInstance.setQuestionSkips(new ArrayList<String>(Constants.CACHED_QUESTIONS));
+        }
 		savedInstance.setQuestionIds(ApplicationEx.getStringArrayPref(getApplicationContext(),
-				ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.questionids_key)));
-		if (savedInstance.getQuestionIds() == null)
-			savedInstance.setQuestionIds(new ArrayList<String>(
-					Constants.CACHED_QUESTIONS));
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.questionids_key)));
+		if (savedInstance.getQuestionIds() == null) {
+            savedInstance.setQuestionIds(new ArrayList<String>(Constants.CACHED_QUESTIONS));
+        }
 		if (savedInstance.getQuestionIds().isEmpty()) {
-			String questionId = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getCurrQuestionId(userId);
+			String questionId = DatabaseHelperSingleton.instance(getApplicationContext()).getCurrQuestionId(userId);
 			boolean questionHint = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getCurrQuestionHint(userId);
+                    .getCurrQuestionHint(userId);
 			if (questionId != null) {
 				addQuestionId(questionId);
 				addQuestionHint(questionHint);
 				addQuestionSkip(false);
 			}
-			questionId = DatabaseHelperSingleton.instance(getApplicationContext()).getNextQuestionId(
-					userId);
-			questionHint = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getNextQuestionHint(userId);
+			questionId = DatabaseHelperSingleton.instance(getApplicationContext()).getNextQuestionId(userId);
+			questionHint = DatabaseHelperSingleton.instance(getApplicationContext()).getNextQuestionHint(userId);
 			if (questionId != null) {
 				addQuestionId(questionId);
 				addQuestionHint(questionHint);
 				addQuestionSkip(false);
 			}
-			questionId = DatabaseHelperSingleton.instance(getApplicationContext()).getThirdQuestionId(
-					userId);
-			questionHint = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getThirdQuestionHint(userId);
+			questionId = DatabaseHelperSingleton.instance(getApplicationContext()).getThirdQuestionId(userId);
+			questionHint = DatabaseHelperSingleton.instance(getApplicationContext()).getThirdQuestionHint(userId);
 			if (questionId != null) {
 				addQuestionId(questionId);
 				addQuestionHint(questionHint);
@@ -444,88 +416,88 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			}
 		}
 		savedInstance.setQuestions(ApplicationEx.getStringArrayPref(getApplicationContext(),
-				ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.questions_key)));
-		if (savedInstance.getQuestions() == null)
-			savedInstance.setQuestions(new ArrayList<String>(
-					Constants.CACHED_QUESTIONS));
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.questions_key)));
+		if (savedInstance.getQuestions() == null) {
+            savedInstance.setQuestions(new ArrayList<String>(Constants.CACHED_QUESTIONS));
+        }
 		if (savedInstance.getQuestions().isEmpty()) {
-			String question = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getCurrQuestionQuestion(userId);
-			if (question != null)
-				addQuestion(question);
-			question = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getNextQuestionQuestion(userId);
-			if (question != null)
-				addQuestion(question);
-			question = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getThirdQuestionQuestion(userId);
-			if (question != null)
-				addQuestion(question);
+			String question = DatabaseHelperSingleton.instance(getApplicationContext()).getCurrQuestionQuestion(userId);
+			if (question != null) {
+                addQuestion(question);
+            }
+			question = DatabaseHelperSingleton.instance(getApplicationContext()).getNextQuestionQuestion(userId);
+			if (question != null) {
+                addQuestion(question);
+            }
+			question = DatabaseHelperSingleton.instance(getApplicationContext()).getThirdQuestionQuestion(userId);
+			if (question != null) {
+                addQuestion(question);
+            }
 		}
 		savedInstance.setQuestionAnswers(ApplicationEx.getStringArrayPref(getApplicationContext(),
-				ResourcesSingleton.instance(getApplicationContext())
-						.getString(R.string.questionanswers_key)));
-		if (savedInstance.getQuestionAnswers() == null)
-			savedInstance.setQuestionAnswers(new ArrayList<String>(
-					Constants.CACHED_QUESTIONS));
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.questionanswers_key)));
+		if (savedInstance.getQuestionAnswers() == null) {
+            savedInstance.setQuestionAnswers(new ArrayList<String>(Constants.CACHED_QUESTIONS));
+        }
 		if (savedInstance.getQuestionAnswers().isEmpty()) {
 			String questionAnswer = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getCurrQuestionAnswer(userId);
-			if (questionAnswer != null)
-				addQuestionAnswer(questionAnswer);
-			questionAnswer = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getNextQuestionAnswer(userId);
-			if (questionAnswer != null)
-				addQuestionAnswer(questionAnswer);
-			questionAnswer = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getThirdQuestionAnswer(userId);
-			if (questionAnswer != null)
-				addQuestionAnswer(questionAnswer);
+                    .getCurrQuestionAnswer(userId);
+			if (questionAnswer != null) {
+                addQuestionAnswer(questionAnswer);
+            }
+			questionAnswer = DatabaseHelperSingleton.instance(getApplicationContext()).getNextQuestionAnswer(userId);
+			if (questionAnswer != null) {
+                addQuestionAnswer(questionAnswer);
+            }
+			questionAnswer = DatabaseHelperSingleton.instance(getApplicationContext()).getThirdQuestionAnswer(userId);
+			if (questionAnswer != null) {
+                addQuestionAnswer(questionAnswer);
+            }
 		}
 		savedInstance.setQuestionCategories(ApplicationEx.getStringArrayPref(getApplicationContext(),
-				ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.questioncategories_key)));
-		if (savedInstance.getQuestionCategories() == null)
-			savedInstance.setQuestionCategories(new ArrayList<String>(
-					Constants.CACHED_QUESTIONS));
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.questioncategories_key)));
+		if (savedInstance.getQuestionCategories() == null) {
+            savedInstance.setQuestionCategories(new ArrayList<String>(Constants.CACHED_QUESTIONS));
+        }
 		if (savedInstance.getQuestionCategories().isEmpty()) {
 			String questionCategory = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getCurrQuestionCategory(userId);
-			if (questionCategory != null)
-				addQuestionCategory(questionCategory);
+                    .getCurrQuestionCategory(userId);
+			if (questionCategory != null) {
+                addQuestionCategory(questionCategory);
+            }
 			questionCategory = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getNextQuestionCategory(userId);
-			if (questionCategory != null)
-				addQuestionCategory(questionCategory);
+                    .getNextQuestionCategory(userId);
+			if (questionCategory != null) {
+                addQuestionCategory(questionCategory);
+            }
 			questionCategory = DatabaseHelperSingleton.instance(getApplicationContext())
 					.getThirdQuestionCategory(userId);
-			if (questionCategory != null)
-				addQuestionCategory(questionCategory);
+			if (questionCategory != null) {
+                addQuestionCategory(questionCategory);
+            }
 		}
 		savedInstance.setQuestionScores(ApplicationEx.getStringArrayPref(getApplicationContext(),
-				ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.questionscores_key)));
-		if (savedInstance.getQuestionScores() == null)
-			savedInstance.setQuestionScores(new ArrayList<String>(
-					Constants.CACHED_QUESTIONS));
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.questionscores_key)));
+		if (savedInstance.getQuestionScores() == null) {
+            savedInstance.setQuestionScores(new ArrayList<String>(Constants.CACHED_QUESTIONS));
+        }
 		if (savedInstance.getQuestionScores().isEmpty()) {
 			String questionScore = DatabaseHelperSingleton.instance(getApplicationContext())
 					.getCurrQuestionScore(userId);
-			if (questionScore != null)
-				addQuestionScore(questionScore);
-			questionScore = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getNextQuestionScore(userId);
-			if (questionScore != null)
-				addQuestionScore(questionScore);
-			questionScore = DatabaseHelperSingleton.instance(getApplicationContext())
-					.getThirdQuestionScore(userId);
-			if (questionScore != null)
-				addQuestionScore(questionScore);
+			if (questionScore != null) {
+                addQuestionScore(questionScore);
+            }
+			questionScore = DatabaseHelperSingleton.instance(getApplicationContext()).getNextQuestionScore(userId);
+			if (questionScore != null) {
+                addQuestionScore(questionScore);
+            }
+			questionScore = DatabaseHelperSingleton.instance(getApplicationContext()).getThirdQuestionScore(userId);
+			if (questionScore != null) {
+                addQuestionScore(questionScore);
+            }
 		}
 		savedInstance.setCorrectAnswers(ApplicationEx.getStringArrayPref(getApplicationContext(),
-				ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.correct_key)));
+				ResourcesSingleton.instance(getApplicationContext()).getString(R.string.correct_key)));
 	}
 
 	@Override
@@ -540,14 +512,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
             tracker.setScreenName("ActivityMain/SetlistNotificationClicked");
 			tracker.send(new HitBuilders.ScreenViewBuilder().build());
 			goToSetlist = true;
-		} else
-			goToSetlist = false;
-	}
-
-	@Override
-	public void onSaveInstanceState(Bundle outState) {
-		outState.putSerializable("savedInstance", savedInstance);
-		super.onSaveInstanceState(outState);
+		} else {
+            goToSetlist = false;
+        }
 	}
 
 	@Override
@@ -559,14 +526,12 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		if (getScoreTask != null) {
 			getScoreTask.cancel(true);
 		}
-		if (user == null) {
-			user = Backendless.UserService.CurrentUser();
-        }
-		if (savedInstance.getUserId() == null && user != null) {
-			savedInstance.setUserId(user.getObjectId());
-			if (savedInstance.getUserId() != null) {
-				getUserData(savedInstance.getUserId());
-			}
+		if (!savedInstance.getUserId().isEmpty()) {
+            if (loginTask != null) {
+                loginTask.cancel(true);
+            }
+            loginTask = new LoginTask();
+            loginTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 		}
         // TODO Figure out how to make displayName for Facebook
         /**
@@ -575,7 +540,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		}
          */
 		if (!savedInstance.isLogging()) {
-			if (savedInstance.getUserId() == null) {
+			if (savedInstance.getUserId().isEmpty()) {
 				if (!savedInstance.isLoggedIn()) {
 					logOut();
 				} else {
@@ -611,11 +576,11 @@ public class ActivityMain extends SlidingFragmentActivity implements
 						}
 					}
 				} else {
-					showLoggedInFragment();
-				}
+                    showLoggedInFragment();
+                }
 			}
 		} else {
-			if (savedInstance.getUserId() != null) {
+			if (!savedInstance.getUserId().isEmpty()) {
 				setupUser(savedInstance.isNewUser());
 			} else if (!facebookLogin) {
 				checkUser();
@@ -630,28 +595,22 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		if (savedInstance.getSelectedSet() == null) {
 			savedInstance.setSelectedSet((SetInfo) FileCacheSingleton.instance(getApplicationContext())
 					.readSerializableFromFile(Constants.SELECTED_SET_FILE));
-			savedInstance.setSetlistMap(
-					new TreeMap<String, TreeMap<String, String>>(
-							new YearComparator()));
+			savedInstance.setSetlistMap(new TreeMap<String, TreeMap<String, String>>(new YearComparator()));
 			TreeMap<String, TreeMap<String, String>> tempMap = (TreeMap<String,
 					TreeMap<String, String>>) FileCacheSingleton.instance(getApplicationContext())
 					.readSerializableFromFile(Constants.SETLIST_MAP_FILE);
 			if (tempMap != null) {
 				TreeMap<String, String> tempChild;
-				for (Entry<String, TreeMap<String, String>> entry :
-						tempMap.entrySet()) {
-					tempChild = new TreeMap<>(
-							new SetlistComparator());
+				for (Entry<String, TreeMap<String, String>> entry : tempMap.entrySet()) {
+					tempChild = new TreeMap<>(new SetlistComparator());
 					tempChild.putAll(entry.getValue());
-					savedInstance.getSetlistMap().put(entry.getKey(),
-							tempChild);
+					savedInstance.getSetlistMap().put(entry.getKey(), tempChild);
 				}
 			}
 		}
 		ApplicationEx.setActive();
 		nManager.cancel(Constants.NOTIFICATION_NEW_QUESTIONS);
-		getApplicationContext().registerReceiver(connReceiver, new IntentFilter(
-				Constants.ACTION_CONNECTION));
+		getApplicationContext().registerReceiver(connReceiver, new IntentFilter(Constants.ACTION_CONNECTION));
 		IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(Constants.ACTION_UPDATE_SETLIST);
         intentFilter.addAction(Constants.ACTION_NEW_SONG);
@@ -703,10 +662,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
     	
         @Override
         protected Void doInBackground(Void... nothing) {
-        	PowerManager pm = 
-                    (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
-                    Constants.SETLIST_WAKE_LOCK);
+        	PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, Constants.SETLIST_WAKE_LOCK);
             wakeLock.acquire();
             return null;
         }
@@ -720,13 +677,13 @@ public class ActivityMain extends SlidingFragmentActivity implements
         
         @Override
         protected void onPostExecute(Void nothing) {
-        	if ((!intent.hasExtra("success") ||
-            		intent.getBooleanExtra("success", false))) {
-        		Log.i(Constants.LOG_TAG, "FragmentBase ReceiveTask");
-                currFrag.updateSetText();
-        	}
-            else {
-                currFrag.showNetworkProblem();
+            if (currFrag != null) {
+                if ((!intent.hasExtra("success") || intent.getBooleanExtra("success", false))) {
+                    Log.i(Constants.LOG_TAG, "FragmentBase ReceiveTask");
+                    currFrag.updateSetText();
+                } else {
+                    currFrag.showNetworkProblem();
+                }
             }
         	wakeLock.release();
         }
@@ -737,11 +694,10 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			FragmentLogin fLogin = new FragmentLogin();
 			currFrag = fLogin;
 			FragmentTransaction ft = fMan.beginTransaction();
-			if (currFrag != null && currFrag instanceof FragmentPager
-					&& currFrag.isVisible())
-				((FragmentPager) currFrag).removeChildren(ft);
-			ft.replace(android.R.id.content, fLogin, "fLogin")
-					.commitAllowingStateLoss();
+			if (currFrag != null && currFrag instanceof FragmentPager && currFrag.isVisible()) {
+                ((FragmentPager) currFrag).removeChildren(ft);
+            }
+			ft.replace(android.R.id.content, fLogin, "fLogin").commitAllowingStateLoss();
 			fMan.executePendingTransactions();
 			getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
 			getSlidingMenu().setTouchModeBehind(SlidingMenu.TOUCHMODE_NONE);
@@ -752,13 +708,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
 	private void showLoggedInFragment() {
 		// fetchDisplayName();
-		if (user == null) {
-            user = Backendless.UserService.CurrentUser();
-        }
-		if (user != null && savedInstance.getDisplayName() == null) {
-			savedInstance.setDisplayName((String) user.getProperty("displayName"));
-			DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(
-					savedInstance.getDisplayName(),
+		if (Backendless.UserService.CurrentUser() != null && savedInstance.getDisplayName() == null) {
+			savedInstance.setDisplayName((String) Backendless.UserService.CurrentUser().getProperty("displayName"));
+			DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(savedInstance.getDisplayName(),
 					DatabaseHelper.COL_DISPLAY_NAME, savedInstance.getUserId());
 		}
 		if (savedInstance.isInStats()) {
@@ -772,19 +724,17 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		 */
 		else {
 			savedInstance.setLogging(false);
-			DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(
-					savedInstance.isLogging() ? 1 : 0,
+			DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(savedInstance.isLogging() ? 1 : 0,
 					DatabaseHelper.COL_LOGGING, savedInstance.getUserId());
 			savedInstance.setLoggedIn(true);
-			DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(
-					savedInstance.isLoggedIn() ? 1 : 0,
+			DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(savedInstance.isLoggedIn() ? 1 : 0,
 					DatabaseHelper.COL_LOGGED_IN, savedInstance.getUserId());
 			showQuiz();
 		}
 	}
 
 	private void fetchDisplayName() {
-		if (savedInstance.getUserId() == null) {
+		if (savedInstance.getUserId().isEmpty()) {
 			return;
 		}
         // TODO Where is stayLoggedIn set?
@@ -827,20 +777,14 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	}
 
 	private void checkUser() {
-		noConnection.setVisibility(View.INVISIBLE);
-        user = Backendless.UserService.CurrentUser();
-		if (user == null)
-			savedInstance.setUserId(null);
-		else {
-			savedInstance.setUserId(user.getObjectId());
-			if (savedInstance.getUserId() != null)
-				getUserData(savedInstance.getUserId());
+        if (!savedInstance.getUserId().isEmpty()) {
+            getUserData(savedInstance.getUserId());
 		}
-		if (!savedInstance.isLoggedIn() && !savedInstance.isLogging() &&
-				(user == null || savedInstance.getUserId() == null))
-			logOut();
-		else
-			setupUser(savedInstance.isNewUser());
+		if (!savedInstance.isLoggedIn() && !savedInstance.isLogging() && savedInstance.getUserId().isEmpty()) {
+            logOut();
+        } else {
+            setupUser(savedInstance.isNewUser());
+        }
 	}
 
 	@Override
@@ -853,9 +797,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	public void onBackPressed() {
 		if (!savedInstance.isInStats() && !savedInstance.isInLoad() &&
 				!savedInstance.isLogging() && !savedInstance.isInInfo() &&
-				!savedInstance.isInFaq())
-			moveTaskToBack(true);
-		else {
+				!savedInstance.isInFaq()) {
+            moveTaskToBack(true);
+        } else {
 			if (savedInstance.isInLoad()) {
 				if (getStatsTask != null)
 					getStatsTask.cancel(true);
@@ -884,10 +828,15 @@ public class ActivityMain extends SlidingFragmentActivity implements
 						savedInstance.isInInfo() ? 1 : 0,
 						DatabaseHelper.COL_IN_INFO, savedInstance.getUserId());
 			} else if (savedInstance.isLogging()) {
-				if (userTask != null)
-					userTask.cancel(true);
-				if (getScoreTask != null)
-					getScoreTask.cancel(true);
+                if (loginTask != null) {
+                    loginTask.cancel(true);
+                }
+				if (userTask != null) {
+                    userTask.cancel(true);
+                }
+				if (getScoreTask != null) {
+                    getScoreTask.cancel(true);
+                }
 				logOut();
 			}
 		}
@@ -905,8 +854,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			 * ft.setCustomAnimations(R.anim.slide_in_left,
 			 * R.anim.slide_out_right);
 			 */
-			ft.replace(android.R.id.content, fQuiz, "fQuiz")
-					.commitAllowingStateLoss();
+			ft.replace(android.R.id.content, fQuiz, "fQuiz").commitAllowingStateLoss();
 			fMan.executePendingTransactions();
 			refreshSlidingMenu();
 		} catch (IllegalStateException e) {
@@ -915,6 +863,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	}
 
 	private void showSplash() {
+		Log.i(Constants.LOG_TAG, "ActivityMain showSplash");
 		try {
 			FragmentPager fSplash = new FragmentPager();
 			currFrag = fSplash;
@@ -925,8 +874,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			 * ft.setCustomAnimations(R.anim.slide_in_left,
 			 * R.anim.slide_out_right);
 			 */
-			ft.replace(android.R.id.content, fSplash, "fSplash")
-					.commitAllowingStateLoss();
+			ft.replace(android.R.id.content, fSplash, "fSplash").commitAllowingStateLoss();
 			fMan.executePendingTransactions();
 			refreshSlidingMenu();
 		} catch (IllegalStateException e) {
@@ -948,13 +896,16 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		if (getNextQuestionsTask != null) {
 			getNextQuestionsTask.cancel(true);
 		}
+        if (loginTask != null) {
+            loginTask.cancel(true);
+        }
 		if (userTask != null) {
 			userTask.cancel(true);
 		}
 		if (getStatsTask != null) {
 			getStatsTask.cancel(true);
 		}
-		if (!savedInstance.isLogging() && savedInstance.getUserId() != null
+		if (!savedInstance.isLogging() && !savedInstance.getUserId().isEmpty()
 				&& !DatabaseHelperSingleton.instance(getApplicationContext()).isAnonUser(
 						savedInstance.getUserId()))
 			getScore(false, false, savedInstance.getUserId(), false);
@@ -965,6 +916,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
 				Constants.SELECTED_SET_FILE, savedInstance.getSelectedSet());
 		FileCacheSingleton.instance(getApplicationContext()).saveSerializableToFile(
 				Constants.SETLIST_MAP_FILE, savedInstance.getSetlistMap());
+        if (isFinishing()) {
+            fMan.beginTransaction().remove(retainedFrag).commit();
+        }
 		super.onPause();
 	}
 
@@ -974,8 +928,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	}
 
 	private void getScore(boolean show, boolean restore, String userId, boolean newUser) {
-		if (getScoreTask != null)
-			getScoreTask.cancel(true);
+		if (getScoreTask != null) {
+            getScoreTask.cancel(true);
+        }
 		getScoreTask = new GetScoreTask(show, restore, userId, newUser);
         getScoreTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 	}
@@ -985,12 +940,10 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		private boolean restore;
 		private String userId;
 		private boolean newUser;
-		private Number number;
 		private ArrayList<String> tempAnswers;
-		private int tempScore = 0;
+		private Integer correctScore = 0;
 
-		private GetScoreTask(boolean show, boolean restore, String userId,
-				boolean newUser) {
+		private GetScoreTask(boolean show, boolean restore, String userId, boolean newUser) {
 			this.show = show;
 			this.restore = restore;
 			this.userId = userId;
@@ -1011,152 +964,32 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
 		@Override
 		protected Void doInBackground(Void... nothing) {
-			int questionScore = -1;
 			// Find correct answers for current user
-            QueryOptions queryOptions = new QueryOptions();
-            queryOptions.addRelated("correct");
-            queryOptions.setPageSize(1);
-            queryOptions.setOffset(0);
-            BackendlessDataQuery query = new BackendlessDataQuery();
-            query.setQueryOptions(queryOptions);
-            List<String> relations = new ArrayList<>();
-            relations.add("correct");
-            relations.add("hint");
-            Backendless.Data.of(BackendlessUser.class).loadRelations(
-                    Backendless.UserService.CurrentUser(), relations);
-            Object[] correctObjects =
-                    (Object[]) Backendless.UserService.CurrentUser().getProperty("correct");
-            ApplicationEx.showLongToast("correctObjects: " + correctObjects.length);
-            Object[] hintObjects =
-                    (Object[]) Backendless.UserService.CurrentUser().getProperty("hint");
-            ApplicationEx.showLongToast("hintObjects: " + hintObjects.length);
-            for (Object correctObject : correctObjects) {
-                // TODO Add all the scores
-                // If there is no score, 1000
+            List<BackendlessUser> userList = getUserRelations(userId, "correct", "hint");
+            if (userList != null && !userList.isEmpty()) {
+                BackendlessUser user = userList.get(0);
+                Object[] corrects = (Object[]) user.getProperty("correct");
+                Object[] hints = (Object[]) user.getProperty("hint");
+                Integer tempScore;
+                ArrayList<String> hintIds = new ArrayList<>(hints.length);
+                for (Object hint : hints) {
+                    hintIds.add(((HashMap<String, Object>) hint).get("objectId").toString());
+                }
+                for (Object correct : corrects) {
+                    tempScore = (Integer) ((HashMap<String, Object>) correct).get("score");
+                    if (tempScore == null) {
+                        tempScore = 1000;
+                    }
+                    if (hintIds.contains(((HashMap<String, Object>) correct).get("objectId").toString())) {
+                        tempScore = tempScore / 2;
+                    }
+                    correctScore += tempScore;
+                    tempAnswers.add(((HashMap<String, Object>) correct).get("objectId").toString());
+                    if (isCancelled()) {
+                        return null;
+                    }
+                }
             }
-            for (Object hintObject : hintObjects) {
-                // TODO Add all the scores
-                // Divide these by 2 because they are hinted
-            }
-            /**
-			ParseQuery<ParseObject> correctQuery = new ParseQuery<ParseObject>(
-					"CorrectAnswers");
-			correctQuery.whereEqualTo("userId", userId);
-			correctQuery.setLimit(1000);
-			// Find the questions of the correct answers
-			ParseQuery<ParseObject> query = new ParseQuery<ParseObject>(
-					"Question");
-			query.setLimit(1000);
-			// Delete dupes
-			ParseQuery<ParseObject> deleteQuery = new ParseQuery<ParseObject>(
-					"CorrectAnswers");
-			deleteQuery.whereEqualTo("userId", userId);
-			deleteQuery.setLimit(1000);
-			do {
-				// Find hinted correct answers
-				correctQuery.whereEqualTo("hint", true);
-				// Skip correct answers already found
-				correctQuery.whereNotContainedIn("questionId", tempAnswers);
-				// Get the question object of these correct answers
-				query.whereMatchesKeyInQuery("objectId", "questionId",
-						correctQuery);
-				try {
-					scoreList = query.find();
-					if (scoreList.size() == 0)
-						break;
-					for (ParseObject score : scoreList) {
-						if (isCancelled())
-							return null;
-						// Delete this answer if we already have it (not the
-						// question)
-						// Likely not found too often
-						if (tempAnswers.contains(score.getObjectId())
-								&& userId != null) {
-							deleteQuery.whereEqualTo("questionId",
-									score.getObjectId());
-							deleteList = deleteQuery.find();
-							for (int i = 1; i < deleteList.size(); i++) {
-								try {
-									deleteList.get(i).deleteEventually();
-								} catch (RuntimeException exception) {
-								}
-							}
-						} else {
-							// Get this score and add it, reducing it first
-							number = score.getNumber("score");
-							questionScore = number == null ? 1000 : number
-									.intValue();
-							tempScore += questionScore / 2;
-							tempAnswers.add(score.getObjectId());
-						}
-					}
-				} catch (OutOfMemoryError memErr) {
-					Log.e(Constants.LOG_TAG, "Error: " + memErr.getMessage());
-					if (userTask != null)
-						userTask.cancel(true);
-					if (getScoreTask != null)
-						getScoreTask.cancel(true);
-					getScore(show, restore, userId, newUser);
-				} catch (ParseException e) {
-					Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
-					if (userTask != null)
-						userTask.cancel(true);
-					if (getScoreTask != null)
-						getScoreTask.cancel(true);
-					if (show && currFrag != null)
-						currFrag.showNetworkProblem();
-				}
-				// Keep going until no more are found
-			} while (!isCancelled());
-			// Find the non-hinted ones and add their score, deleting dupes also
-			do {
-				correctQuery.whereEqualTo("hint", false);
-				correctQuery.whereNotContainedIn("questionId", tempAnswers);
-				query.whereMatchesKeyInQuery("objectId", "questionId",
-						correctQuery);
-				try {
-					scoreList = query.find();
-					if (scoreList.size() == 0)
-						break;
-					for (ParseObject score : scoreList) {
-						if (isCancelled())
-							return null;
-						if (tempAnswers.contains(score.getObjectId())
-								&& userId != null) {
-							deleteQuery.whereEqualTo("questionId",
-									score.getObjectId());
-							deleteList = deleteQuery.find();
-							for (int i = 1; i < deleteList.size(); i++) {
-								try {
-									deleteList.get(i).deleteEventually();
-								} catch (RuntimeException exception) {
-								}
-							}
-						} else {
-							number = score.getNumber("score");
-							questionScore = number == null ? 1000 : number
-									.intValue();
-							tempScore += questionScore;
-							tempAnswers.add(score.getObjectId());
-						}
-					}
-				} catch (OutOfMemoryError memErr) {
-					Log.e(Constants.LOG_TAG, "Error: " + memErr.getMessage());
-					if (userTask != null)
-						userTask.cancel(true);
-					if (getScoreTask != null)
-						getScoreTask.cancel(true);
-					getScore(show, restore, userId, newUser);
-				} catch (ParseException e) {
-					Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
-					if (userTask != null)
-						userTask.cancel(true);
-					if (getScoreTask != null)
-						getScoreTask.cancel(true);
-					if (show && currFrag != null)
-						currFrag.showNetworkProblem();
-				}
-			} while (!isCancelled());
 			// TODO Revisit when adding levels back
 			/*
 			 * ParseQuery scoreQuery = new ParseQuery("Question"); try {
@@ -1177,8 +1010,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			 * currFrag.showNetworkProblem(); }
 			 */
 			if (!isCancelled()) {
-				savedInstance.setCurrScore(tempScore);
-				tempScore = 0;
+				savedInstance.setCurrScore(correctScore);
+                correctScore = 0;
 				saveUserScore(savedInstance.getCurrScore());
 				savedInstance.setCorrectAnswers(new ArrayList<>(tempAnswers));
 				ApplicationEx.setStringArrayPref(getApplicationContext(),
@@ -1186,13 +1019,13 @@ public class ActivityMain extends SlidingFragmentActivity implements
 						savedInstance.getCorrectAnswers());
 				publishProgress();
 			}
-			tempScore = 0;
+            correctScore = 0;
 			return null;
 		}
 
 		@Override
 		protected void onCancelled(Void nothing) {
-			tempScore = 0;
+			correctScore = 0;
 		}
 
 		protected void onProgressUpdate(Void... nothing) {
@@ -1205,11 +1038,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
                         // TODO
 					}
 				} else {
-					getNextQuestions(
-							false,
-							SharedPreferencesSingleton.instance(getApplicationContext())
-									.getInt(ResourcesSingleton.instance(getApplicationContext())
-											.getString(R.string.level_key),
+					getNextQuestions(false,
+							SharedPreferencesSingleton.instance(getApplicationContext()).getInt(
+                                    ResourcesSingleton.instance(getApplicationContext()).getString(R.string.level_key),
 											Constants.HARD));
 				}
 			}
@@ -1222,6 +1053,27 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		protected void onPostExecute(Void nothing) {
 		}
 	}
+
+    private List<BackendlessUser> getUserRelations(String userId, String... relations) {
+        QueryOptions queryOptions = new QueryOptions();
+        for (String relation : relations) {
+            queryOptions.addRelated(relation);
+        }
+        queryOptions.setPageSize(1);
+        queryOptions.setOffset(0);
+        BackendlessDataQuery query = new BackendlessDataQuery();
+        query.setQueryOptions(queryOptions);
+        query.setWhereClause("objectId = '" + userId + "'");
+        try {
+            return Backendless.Data.of(BackendlessUser.class).find(query).getData();
+        } catch (BackendlessException e) {
+            Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
+            if (currFrag != null) {
+                currFrag.showNetworkProblem();
+            }
+            return null;
+        }
+    }
 
 	private void goToQuiz() {
 		savedInstance.setLogging(false);
@@ -1243,6 +1095,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			setBackgroundWaitTask.cancel(true);
 		if (getScoreTask != null)
 			getScoreTask.cancel(true);
+		retainedFrag.setSavedInstance(savedInstance);
 		super.onDestroy();
 	}
 
@@ -1423,8 +1276,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	private void refreshSlidingMenu() {
 		if (!savedInstance.isLoggedIn()) {
 			setBehindContentView(R.layout.menu_splash);
-			switch (ResourcesSingleton.instance(getApplicationContext()).getConfiguration()
-					.orientation) {
+			switch (ResourcesSingleton.instance(getApplicationContext()).getConfiguration().orientation) {
 			case Configuration.ORIENTATION_LANDSCAPE:
 				getSlidingMenu().setBehindOffsetRes(R.dimen.menu_width_land);
 				break;
@@ -1432,8 +1284,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 				getSlidingMenu().setBehindOffsetRes(R.dimen.menu_width_port);
 				break;
 			}
-			infoButton = (RelativeLayout) getSlidingMenu().findViewById(
-					R.id.InfoButton);
+            RelativeLayout infoButton = (RelativeLayout) getSlidingMenu().findViewById(R.id.InfoButton);
 			infoButton.setOnClickListener(new OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -1470,19 +1321,19 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			 * switchButton = (RelativeLayout)
 			 * getSlidingMenu().findViewById(R.id.SwitchButton);
 			 * switchButton.setOnClickListener(new OnClickListener() {
-			 * 
+			 *
 			 * @Override public void onClick(View arg0) {
 			 * switchButton.setEnabled(false); if
 			 * (getSlidingMenu().isMenuShowing()) {
 			 * getSlidingMenu().setOnClosedListener(new OnClosedListener() {
-			 * 
+			 *
 			 * @Override public void onClosed() {
 			 * getSlidingMenu().setOnClosedListener(null);
 			 * setBackground(getSplashBackground(), true, "splash"); } });
 			 * getSlidingMenu().showContent(); } } });
 			 * switchButton.setEnabled(true);
 			 */
-			exitButton = (RelativeLayout) getSlidingMenu().findViewById(
+            RelativeLayout exitButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.ExitButton);
 			exitButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -1678,7 +1529,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
-			notificationsButton = (RelativeLayout) getSlidingMenu()
+            RelativeLayout notificationsButton = (RelativeLayout) getSlidingMenu()
 					.findViewById(R.id.NotificationsButton);
 			notificationsText = (CheckedTextView) getSlidingMenu()
 					.findViewById(R.id.NotificationsText);
@@ -1792,8 +1643,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			});
 		} else if (!savedInstance.isInStats()) {
 			setBehindContentView(R.layout.menu_quiz);
-			switch (ResourcesSingleton.instance(getApplicationContext()).getConfiguration()
-					.orientation) {
+			switch (ResourcesSingleton.instance(getApplicationContext()).getConfiguration().orientation) {
 			case Configuration.ORIENTATION_LANDSCAPE:
 				getSlidingMenu().setBehindOffsetRes(R.dimen.menu_width_land);
 				break;
@@ -1801,8 +1651,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
 				getSlidingMenu().setBehindOffsetRes(R.dimen.menu_width_port);
 				break;
 			}
-			statsButton = (RelativeLayout) getSlidingMenu().findViewById(
-					R.id.StatsButton);
+            /**
+            RelativeLayout statsButton = (RelativeLayout) getSlidingMenu().findViewById(R.id.StatsButton);
 			if (DatabaseHelperSingleton.instance(getApplicationContext()).isAnonUser(
 					savedInstance.getUserId())) {
 				statsButton.setVisibility(View.GONE);
@@ -1821,23 +1671,25 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				});
 			}
+             */
 			/*
 			 * switchButton = (RelativeLayout)
 			 * getSlidingMenu().findViewById(R.id.SwitchButton);
 			 * switchButton.setOnClickListener(new OnClickListener() {
-			 * 
+			 *
 			 * @Override public void onClick(View arg0) {
 			 * switchButton.setEnabled(false); if
 			 * (getSlidingMenu().isMenuShowing()) {
 			 * getSlidingMenu().setOnClosedListener(new OnClosedListener() {
-			 * 
+			 *
 			 * @Override public void onClosed() {
 			 * getSlidingMenu().setOnClosedListener(null);
 			 * setBackground(getQuizBackground(), true, "quiz"); } });
 			 * getSlidingMenu().showContent(); } } });
 			 * switchButton.setEnabled(true);
 			 */
-			reportButton = (RelativeLayout) getSlidingMenu().findViewById(
+            /**
+            RelativeLayout reportButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.ReportButton);
 			reportButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -1874,7 +1726,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
-			shareButton = (RelativeLayout) getSlidingMenu().findViewById(
+            RelativeLayout shareButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.ShareButton);
 			shareButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -1904,10 +1756,10 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
-			logoutButton = (RelativeLayout) getSlidingMenu().findViewById(
+            RelativeLayout logoutButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.LogoutButton);
-			logoutText = (TextView) findViewById(R.id.LogoutText);
-			nameButton = (RelativeLayout) getSlidingMenu().findViewById(
+            TextView logoutText = (TextView) findViewById(R.id.LogoutText);
+            RelativeLayout nameButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.NameButton);
 			nameButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -1959,7 +1811,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
-			exitButton = (RelativeLayout) getSlidingMenu().findViewById(
+             */
+            RelativeLayout exitButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.ExitButton);
 			exitButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -1975,6 +1828,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
+            /**
 			levelButton = (RelativeLayout) getSlidingMenu().findViewById(R.id.LevelButton);
 			levelImage = (ImageViewEx) getSlidingMenu().findViewById(R.id.LevelImage);
 			levelText = (TextView) getSlidingMenu().findViewById(R.id.LevelText);
@@ -2007,20 +1861,20 @@ public class ActivityMain extends SlidingFragmentActivity implements
 						case Constants.EASY:
 							SharedPreferencesSingleton.putInt(
 									R.string.level_key, Constants.MEDIUM);
-							levelText.setText(ResourcesSingleton.instance(getApplicationContext())
-									.getString(R.string.LevelTitle) + " (Medium)");
+                            levelText.setText(String.format(ResourcesSingleton.instance(getApplicationContext())
+                                    .getString(R.string.LevelTitle), "(Medium)"));
 							levelImage.setImageResource(R.drawable.ic_level_med_inverse);
 							break;
 						case Constants.MEDIUM:
 							SharedPreferencesSingleton.putInt(R.string.level_key, Constants.HARD);
-							levelText.setText(ResourcesSingleton.instance(getApplicationContext())
-											.getString(R.string.LevelTitle) + " (Hard)");
+                            levelText.setText(String.format(ResourcesSingleton.instance(getApplicationContext())
+                                    .getString(R.string.LevelTitle), "(Hard)"));
 							levelImage.setImageResource(R.drawable.ic_level_hard_inverse);
 							break;
 						case Constants.HARD:
 							SharedPreferencesSingleton.putInt(R.string.level_key, Constants.EASY);
-							levelText.setText(ResourcesSingleton.instance(getApplicationContext())
-											.getString(R.string.LevelTitle) + " (Easy)");
+                            levelText.setText(String.format(ResourcesSingleton.instance(getApplicationContext())
+                                    .getString(R.string.LevelTitle), "(Easy)"));
 							levelImage.setImageResource(R.drawable.ic_level_easy_inverse);
 							break;
 						}
@@ -2036,7 +1890,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
-			soundsButton = (RelativeLayout) getSlidingMenu().findViewById(
+             */
+            /**
+            RelativeLayout soundsButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.SoundsButton);
 			soundsText = (CheckedTextView) getSlidingMenu().findViewById(
 					R.id.SoundsText);
@@ -2060,6 +1916,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
+             */
 			notificationSoundButton = (RelativeLayout) getSlidingMenu()
 					.findViewById(R.id.NotificationSoundsButton);
 			notificationSoundImage = (ImageViewEx) getSlidingMenu()
@@ -2241,7 +2098,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
-			notificationsButton = (RelativeLayout) getSlidingMenu()
+            RelativeLayout notificationsButton = (RelativeLayout) getSlidingMenu()
 					.findViewById(R.id.NotificationsButton);
 			notificationsText = (CheckedTextView) getSlidingMenu()
 					.findViewById(R.id.NotificationsText);
@@ -2366,7 +2223,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
 				getSlidingMenu().setBehindOffsetRes(R.dimen.menu_width_port);
 				break;
 			}
-			shareButton = (RelativeLayout) getSlidingMenu().findViewById(
+            /**
+            RelativeLayout shareButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.ShareButton);
 			shareButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -2396,7 +2254,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
-			nameButton = (RelativeLayout) getSlidingMenu().findViewById(
+            RelativeLayout nameButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.NameButton);
 			nameButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -2411,7 +2269,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
 						showNameDialog();
 				}
 			});
-			infoButton = (RelativeLayout) getSlidingMenu().findViewById(
+             */
+            RelativeLayout infoButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.InfoButton);
 			infoButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -2446,7 +2305,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					}
 				}
 			});
-			exitButton = (RelativeLayout) getSlidingMenu().findViewById(
+            RelativeLayout exitButton = (RelativeLayout) getSlidingMenu().findViewById(
 					R.id.ExitButton);
 			exitButton.setOnClickListener(new OnClickListener() {
 				@Override
@@ -2483,12 +2342,12 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			 * switchButton = (RelativeLayout)
 			 * getSlidingMenu().findViewById(R.id.SwitchButton);
 			 * switchButton.setOnClickListener(new OnClickListener() {
-			 * 
+			 *
 			 * @Override public void onClick(View arg0) {
 			 * switchButton.setEnabled(false); if
 			 * (getSlidingMenu().isMenuShowing()) {
 			 * getSlidingMenu().setOnClosedListener(new OnClosedListener() {
-			 * 
+			 *
 			 * @Override public void onClosed() {
 			 * getSlidingMenu().setOnClosedListener(null);
 			 * setBackground(getLeadersBackground(), true, "leaders"); } });
@@ -2503,13 +2362,13 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		 * tipsText.setChecked(SharedPreferencesSingleton.instance().getBoolean(
 		 * res.getString(R.string.quicktip_key), false));
 		 * tipsButton.setOnClickListener(new OnClickListener() {
-		 * 
+		 *
 		 * @Override public void onClick(View arg0) { if
 		 * (getSlidingMenu().isMenuShowing()) { tipsText.toggle();
 		 * SharedPreferencesSingleton.toggleBoolean( R.string.quicktip_key,
 		 * true); } } });
 		 */
-		followButton = (RelativeLayout) getSlidingMenu().findViewById(
+        RelativeLayout followButton = (RelativeLayout) getSlidingMenu().findViewById(
 				R.id.FollowButton);
 		followButton.setOnClickListener(new OnClickListener() {
 			@Override
@@ -2539,7 +2398,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					startActivity(getOpenTwitterIntent());
 			}
 		});
-		likeButton = (RelativeLayout) getSlidingMenu().findViewById(
+        RelativeLayout likeButton = (RelativeLayout) getSlidingMenu().findViewById(
 				R.id.LikeButton);
 		likeButton.setOnClickListener(new OnClickListener() {
 			@Override
@@ -2620,9 +2479,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			}
 		});
 		switchButton.setEnabled(true);
-		versionLayout = (RelativeLayout) getSlidingMenu().findViewById(
+        RelativeLayout versionLayout = (RelativeLayout) getSlidingMenu().findViewById(
 				R.id.VersionLayout);
-		versionText = (TextView) getSlidingMenu().findViewById(
+        TextView versionText = (TextView) getSlidingMenu().findViewById(
 				R.id.VersionNumber);
 		try {
 			versionText.setText(getPackageManager().getPackageInfo(
@@ -2648,7 +2507,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			this.setlistListView = setlistListView;
 			this.setlistProgress = setlistProgress;
 		}
-		
+
 		protected void onProgressUpdate(Void... nothing) {
 			setlistListView.setVisibility(View.INVISIBLE);
 			setlistProgress.setVisibility(View.VISIBLE);
@@ -2748,7 +2607,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			showSetlistChooser(setlistListView, setlistProgress);
 		}
 	}
-	
+
 	private void lookForSavedSetInfo() {
 		SetInfo selectedSetInfo = savedInstance.getSelectedSet();
 		if (selectedSetInfo == null) {
@@ -2756,48 +2615,39 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		}
 		if (selectedSetInfo.getSetDate() == null) {
 			selectedSetInfo.setSetDate(SharedPreferencesSingleton.instance(getApplicationContext())
-				.getString(
-						ResourcesSingleton.instance(getApplicationContext()).getString(
-								R.string.set_date_key), ""));
+				.getString(ResourcesSingleton.instance(getApplicationContext()).getString(R.string.set_date_key), ""));
 		}
 		if (selectedSetInfo.getSetVenue() == null) {
 			selectedSetInfo.setSetVenue(SharedPreferencesSingleton.instance(getApplicationContext())
-					.getString(
-							ResourcesSingleton.instance(getApplicationContext()).getString(
-									R.string.setvenue_key), ""));
+					.getString(ResourcesSingleton.instance(getApplicationContext()).getString(R.string.setvenue_key),
+                            ""));
 		}
 		if (selectedSetInfo.getSetCity() == null) {
 			selectedSetInfo.setSetCity(SharedPreferencesSingleton.instance(getApplicationContext())
-					.getString(
-							ResourcesSingleton.instance(getApplicationContext()).getString(
-									R.string.setcity_key), ""));
+					.getString(ResourcesSingleton.instance(getApplicationContext()).getString(R.string.setcity_key),
+                            ""));
 		}
 		if (selectedSetInfo.getSetlist() == null) {
 			selectedSetInfo.setSetlist(SharedPreferencesSingleton.instance(getApplicationContext())
-					.getString(ResourcesSingleton.instance(getApplicationContext()).getString(
-							R.string.setlist_key), ""));
+					.getString(ResourcesSingleton.instance(getApplicationContext()).getString(R.string.setlist_key),
+                            ""));
 		}
-		if (!selectedSetInfo.getSetDate().isEmpty() &&
-				selectedSetInfo.getSetDate().length() >= 4) {
+		if (!selectedSetInfo.getSetDate().isEmpty() && selectedSetInfo.getSetDate().length() >= 4) {
 			TreeMap<String, String> tempMap = savedInstance.getSetlistMap().get(
-					selectedSetInfo.getSetDate().substring(0, 4));
+                    selectedSetInfo.getSetDate().substring(0, 4));
 			if (tempMap != null) {
 				boolean found = false;
 				for (Entry<String, String> temp : tempMap.entrySet()) {
-					found = temp.getKey().contains(
-							selectedSetInfo.getSetDate());
+					found = temp.getKey().contains(selectedSetInfo.getSetDate());
 				}
 				if (!found) {
 					selectedSetInfo.setKey(createSetlistKey(selectedSetInfo));
-					tempMap.put(selectedSetInfo.getKey(),
-							selectedSetInfo.getSetlist());
+					tempMap.put(selectedSetInfo.getKey(), selectedSetInfo.getSetlist());
 				}
 			}
 		}
 		if (selectedSetInfo.getKey() == null) {
-			selectedSetInfo.setKey(
-					savedInstance.getSetlistMap().firstEntry().getValue()
-					.firstKey());
+			selectedSetInfo.setKey(savedInstance.getSetlistMap().firstEntry().getValue().firstKey());
 		}
 		Log.i(Constants.LOG_TAG, "lookForSavedSetInfo: " + selectedSetInfo);
 		savedInstance.setSelectedSet(selectedSetInfo);
@@ -2849,15 +2699,20 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	}
 
 	private Intent getOpenFacebookIntent() {
+        Intent fbIntent = new Intent(Intent.ACTION_VIEW);
 		try {
-            getApplicationContext().getPackageManager()
-					.getPackageInfo("com.facebook.katana", 0);
-			return new Intent(Intent.ACTION_VIEW,
-					Uri.parse("fb://profile/401123586629428"));
+            int versionCode = getApplicationContext().getPackageManager().getPackageInfo("com.facebook.katana", 0)
+                    .versionCode;
+            if (versionCode >= 3002850) {
+                fbIntent.setData(Uri.parse("fb://facewebmodal/f?href=https://www.facebook.com/DMBTrivia"));
+            } else {
+                fbIntent.setData(Uri.parse("fb://page/DMBTrivia"));
+            }
+
 		} catch (Exception e) {
-			return new Intent(Intent.ACTION_VIEW,
-					Uri.parse("https://www.facebook.com/DMBTrivia"));
+            fbIntent.setData(Uri.parse("https://www.facebook.com/DMBTrivia"));
 		}
+        return fbIntent;
 	}
 
 	private Intent getOpenTwitterIntent() {
@@ -2868,16 +2723,16 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	/*
 	 * private class SetlistBackgroundWaitTask extends AsyncTask<Void, Void,
 	 * Void> { private String name; private ImageViewEx background;
-	 * 
+	 *
 	 * private SetlistBackgroundWaitTask(String name, ImageViewEx background) {
 	 * this.name = name; this.background = background; }
-	 * 
+	 *
 	 * @Override protected Void doInBackground(Void... nothing) { if
 	 * (isCancelled()) return null; try { Thread.sleep(1000); } catch
 	 * (InterruptedException e) {} return null; }
-	 * 
+	 *
 	 * @Override protected void onCancelled(Void nothing) { }
-	 * 
+	 *
 	 * @Override protected void onPostExecute(Void nothing) { if
 	 * (!isCancelled()) setlistBackground(name, background); } }
 	 */
@@ -2885,14 +2740,14 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	/*
 	 * @Override public String getSplashBackground() { return splashBackground;
 	 * }
-	 * 
+	 *
 	 * @Override public String getQuizBackground() { return quizBackground; }
-	 * 
+	 *
 	 * @Override public String getLeadersBackground() { return
 	 * leadersBackground; }
-	 * 
+	 *
 	 * @Override public void loadSetlist() { showSetlist(true); }
-	 * 
+	 *
 	 * private void showSetlist(boolean animate) { try { FragmentSetlist
 	 * fSetlist = new FragmentSetlist(); FragmentTransaction ft =
 	 * fMan.beginTransaction(); if (animate)
@@ -3388,11 +3243,16 @@ public class ActivityMain extends SlidingFragmentActivity implements
                     // TODO Fix new user state - only used to show messages in the UI
                     // savedInstance.setNewUser(loggedInUser.isNew());
                     savedInstance.setNewUser(false);
-                    savedInstance.setUserId((String) loggedInUser.getProperty("username"));
+                    savedInstance.setUserId(loggedInUser.getUserId());
+                    if (loginTask != null) {
+                        loginTask.cancel(true);
+                    }
+                    loginTask = new LoginTask();
+                    loginTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
                     if (!DatabaseHelperSingleton.instance(getApplicationContext()).hasUser(savedInstance.getUserId())) {
                         DatabaseHelperSingleton.instance(getApplicationContext()).addUser(loggedInUser, "Facebook");
                     } else {
-                        DatabaseHelperSingleton.instance(getApplicationContext()).setOffset(1, (String) loggedInUser.getProperty("username"));
+                        DatabaseHelperSingleton.instance(getApplicationContext()).setOffset(1, loggedInUser.getUserId());
                     }
                     // TODO Figure out how to make displayName for Facebook
                     // getFacebookDisplayName(loggedInUser);
@@ -3473,7 +3333,12 @@ public class ActivityMain extends SlidingFragmentActivity implements
                     // TODO Fix new user state - only used to show messages in the UI
                     // savedInstance.setNewUser(loggedInUser.isNew());
                     savedInstance.setNewUser(false);
-                    savedInstance.setUserId((String) loggedInUser.getProperty("username"));
+                    savedInstance.setUserId(loggedInUser.getUserId());
+                    if (loginTask != null) {
+                        loginTask.cancel(true);
+                    }
+                    loginTask = new LoginTask();
+                    loginTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
                     // TODO Update displayName
                     /**
                     if (loggedInUser.getProperty("displayName") == null) {
@@ -3496,7 +3361,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
                     if (!DatabaseHelperSingleton.instance(getApplicationContext()).hasUser(savedInstance.getUserId())) {
                         DatabaseHelperSingleton.instance(getApplicationContext()).addUser(loggedInUser, "Twitter");
                     } else {
-                        DatabaseHelperSingleton.instance(getApplicationContext()).setOffset(1, (String) loggedInUser.getProperty("username"));
+                        DatabaseHelperSingleton.instance(getApplicationContext()).setOffset(1, loggedInUser.getUserId());
                     }
                     if (savedInstance.isLogging()) {
                         setupUser(savedInstance.isNewUser());
@@ -3520,13 +3385,20 @@ public class ActivityMain extends SlidingFragmentActivity implements
         Backendless.UserService.register(anonymousUser, new AsyncCallback<BackendlessUser>() {
             @Override
             public void handleResponse(BackendlessUser newUser) {
+                ApplicationEx.showLongToast("registered anonymous user");
                 Backendless.UserService.login((String) anonymousUser.getProperty("username"),
                         (String) anonymousUser.getProperty("password"),
                     new AsyncCallback<BackendlessUser>() {
                         @Override
                         public void handleResponse(BackendlessUser loggedInUser) {
+                            ApplicationEx.showLongToast("logged in anonymous user");
                             savedInstance.setNewUser(true);
-                            savedInstance.setUserId((String) loggedInUser.getProperty("username"));
+                            savedInstance.setUserId(loggedInUser.getUserId());
+                            if (loginTask != null) {
+                                loginTask.cancel(true);
+                            }
+                            loginTask = new LoginTask();
+                            loginTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
                             if (!DatabaseHelperSingleton.instance(getApplicationContext()).hasUser(savedInstance.getUserId())) {
                                 DatabaseHelperSingleton.instance(getApplicationContext()).addUser(loggedInUser, "Anonymous");
                             } else {
@@ -3563,7 +3435,12 @@ public class ActivityMain extends SlidingFragmentActivity implements
             @Override
             public void handleResponse(BackendlessUser newUser) {
                 savedInstance.setNewUser(true);
-                savedInstance.setUserId((String) newUser.getProperty("username"));
+                savedInstance.setUserId(newUser.getUserId());
+                if (loginTask != null) {
+                    loginTask.cancel(true);
+                }
+                loginTask = new LoginTask();
+                loginTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
                 if (!DatabaseHelperSingleton.instance(getApplicationContext()).hasUser(savedInstance.getUserId())) {
                     DatabaseHelperSingleton.instance(getApplicationContext()).addUser(newUser, "Email");
                 } else {
@@ -3598,14 +3475,11 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	}
 
 	private void emailLogin(final String username, String password) {
-        BackendlessUser emailUser = new BackendlessUser();
-        emailUser.setProperty("username", username);
-        emailUser.setProperty("password", password);
         Backendless.UserService.login(username, password, new AsyncCallback<BackendlessUser>() {
             @Override
             public void handleResponse(BackendlessUser newUser) {
                 savedInstance.setNewUser(true);
-                savedInstance.setUserId((String) newUser.getProperty("username"));
+                savedInstance.setUserId(newUser.getUserId());
                 if (!DatabaseHelperSingleton.instance(getApplicationContext()).hasUser(savedInstance.getUserId())) {
                     DatabaseHelperSingleton.instance(getApplicationContext()).addUser(newUser, "Email");
                 } else {
@@ -3639,8 +3513,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			 * if (!fresh) ft.setCustomAnimations(R.anim.slide_in_top,
 			 * R.anim.slide_out_top);
 			 */
-			ft.replace(android.R.id.content, fInfo, "fInfo")
-					.commitAllowingStateLoss();
+			ft.replace(android.R.id.content, fInfo, "fInfo").commitAllowingStateLoss();
 			fMan.executePendingTransactions();
 			getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
 			getSlidingMenu().setTouchModeBehind(SlidingMenu.TOUCHMODE_NONE);
@@ -3671,8 +3544,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			 * ft.setCustomAnimations(R.anim.slide_in_bottom,
 			 * R.anim.slide_out_bottom);
 			 */
-			ft.replace(android.R.id.content, fLoad, "fLoad")
-					.commitAllowingStateLoss();
+			ft.replace(android.R.id.content, fLoad, "fLoad").commitAllowingStateLoss();
 			fMan.executePendingTransactions();
 			getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
 			getSlidingMenu().setTouchModeBehind(SlidingMenu.TOUCHMODE_NONE);
@@ -3695,8 +3567,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			 * if (!fresh) ft.setCustomAnimations(R.anim.slide_in_top,
 			 * R.anim.slide_out_top);
 			 */
-			ft.replace(android.R.id.content, fFaq, "fFaq")
-					.commitAllowingStateLoss();
+			ft.replace(android.R.id.content, fFaq, "fFaq").commitAllowingStateLoss();
 			fMan.executePendingTransactions();
 			getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
 			getSlidingMenu().setTouchModeBehind(SlidingMenu.TOUCHMODE_NONE);
@@ -3745,20 +3616,18 @@ public class ActivityMain extends SlidingFragmentActivity implements
             }
             // TODO
             // Get all hint relations of user
-            BackendlessDataQuery userQuery = new BackendlessDataQuery();
-            userQuery.setWhereClause("username = '" + savedInstance.getUserId() + "'");
-            QueryOptions queryOptions = new QueryOptions();
-            queryOptions.addRelated("hint");
-            userQuery.setQueryOptions(queryOptions);
-            BackendlessUser user = Backendless.Persistence.of(BackendlessUser.class).find(userQuery).getCurrentPage().get(0);
-			hints = ((Question[]) user.getProperty("hint")).length;
-            leadersBundle.putString("userHints", Integer.toString(hints));
+            List<BackendlessUser> userList = getUserRelations(savedInstance.getUserId(), "hint");
+            if (userList != null && !userList.isEmpty()) {
+                BackendlessUser user = userList.get(0);
+                Object[] hints = (Object[]) user.getProperty("hint");
+                leadersBundle.putString("userHints", Integer.toString(hints.length));
+            }
 			if (isCancelled()) {
                 return null;
             }
             // TODO Same but for Backendless
             BackendlessDataQuery questionQuery = new BackendlessDataQuery();
-            queryOptions = new QueryOptions();
+            QueryOptions queryOptions = new QueryOptions();
             queryOptions.addSortByOption("created DESC");
             queryOptions.setPageSize(1);
             questionQuery.setQueryOptions(queryOptions);
@@ -3778,7 +3647,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
             }
             whereClause = whereClause.substring(0, whereClause.lastIndexOf(","));
             whereClause += ")";
-            userQuery = new BackendlessDataQuery();
+            BackendlessDataQuery userQuery = new BackendlessDataQuery();
             userQuery.setWhereClause(whereClause);
             queryOptions = new QueryOptions();
             queryOptions.addSortByOption("score DESC");
@@ -3792,7 +3661,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
             }
             int rank = -1;
             for (int i = 0; i < rankList.size(); i++) {
-                if (((String) rankList.get(i).getProperty("username")).equals(savedInstance.getUserId())) {
+                if ((rankList.get(i).getUserId()).equals(savedInstance.getUserId())) {
                     rank = ++i;
                     break;
                 }
@@ -3851,7 +3720,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 				if (limit >= 50) {
                     break;
                 }
-				userIdList.add(leader.getObjectId());
+				userIdList.add(leader.getUserId());
 				if (limit + 1 < 10) {
                     rankList.add("0" + Integer.toString(limit + 1));
                 } else {
@@ -3864,7 +3733,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
                     tempInt = 0;
                 }
 				scoreList.add(Integer.toString(tempInt));
-				if (leader.getObjectId().equals(savedInstance.getUserId()))
+				if (leader.getUserId().equals(savedInstance.getUserId()))
 					leadersBundle.putString("userScore", Integer.toString(tempInt));
 				limit++;
 				DatabaseHelperSingleton.instance(getApplicationContext()).addLeader(
@@ -3889,15 +3758,22 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	@SuppressLint("NewApi")
 	@Override
 	public void setupUser(boolean newUser) {
-
-		if (savedInstance.getUserId() == null && !savedInstance.isLogging()) {
+		if (savedInstance.getUserId().isEmpty() && !savedInstance.isLogging()) {
+            ApplicationEx.showLongToast("showing splash");
 			showSplash();
 			return;
 		}
-		if (savedInstance.getUserId() != null) {
+		if (!savedInstance.getUserId().isEmpty()) {
+            ApplicationEx.showLongToast("getting user data");
             getUserData(savedInstance.getUserId());
+            if (loginTask != null) {
+                loginTask.cancel(true);
+            }
+            loginTask = new LoginTask();
+            loginTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
 		if (fMan.findFragmentByTag("fLogin") == null) {
+            ApplicationEx.showLongToast("showing login");
             showLogin();
         }
 		if (userTask != null) {
@@ -3923,13 +3799,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
 		@Override
 		protected Void doInBackground(Void... nothing) {
-			user = Backendless.UserService.CurrentUser();
-			if (user == null) {
-                ApplicationEx.showLongToast("user is null!");
-				publishProgress();
-				return null;
-			}
-			if (savedInstance.getUserId() == null) {
+			if (savedInstance.getUserId().isEmpty()) {
                 ApplicationEx.showLongToast("userId is null!");
 				publishProgress();
 				return null;
@@ -3951,7 +3821,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
                 publishProgress();
             }
 			if (savedInstance.getDisplayName() == null && !isCancelled()) {
-				savedInstance.setDisplayName((String) user.getProperty("displayName"));
+				savedInstance.setDisplayName((String) Backendless.UserService.CurrentUser().getProperty("displayName"));
 				DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(
 						savedInstance.getDisplayName(),
 						DatabaseHelper.COL_DISPLAY_NAME,
@@ -3961,10 +3831,12 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		}
 
 		protected void onProgressUpdate(Void... nothing) {
-			if (savedInstance.getUserId() == null || user == null) {
+            Log.i(Constants.LOG_TAG, savedInstance.getUserId());
+			if (savedInstance.getUserId().isEmpty()) {
 				logOut();
 				ApplicationEx.showLongToast("Login failed, try again");
-			} else if (!DatabaseHelperSingleton.instance(getApplicationContext()).isAnonUser(savedInstance.getUserId())) {
+			} else if (!DatabaseHelperSingleton.instance(getApplicationContext()).isAnonUser(
+                    savedInstance.getUserId())) {
                 getScore(true, false, savedInstance.getUserId(), newUser);
             }
 		}
@@ -3975,7 +3847,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
 		@Override
 		protected void onPostExecute(Void nothing) {
-			if (savedInstance.getUserId() != null) {
+            Log.i(Constants.LOG_TAG, "onPostExecute");
+			if (!savedInstance.getUserId().isEmpty()) {
 				switch (ResourcesSingleton.instance(getApplicationContext()).getConfiguration()
 						.orientation) {
 				case Configuration.ORIENTATION_PORTRAIT:
@@ -4027,17 +3900,25 @@ public class ActivityMain extends SlidingFragmentActivity implements
 			SharedPreferencesSingleton.putInt(R.string.skiptextvis_key, View.INVISIBLE);
 			SharedPreferencesSingleton.putString(R.string.hintnum_key, "");
 			SharedPreferencesSingleton.putString(R.string.skipnum_key, "");
-			if (userTask != null)
-				userTask.cancel(true);
-			if (getScoreTask != null)
-				getScoreTask.cancel(true);
-			if (getNextQuestionsTask != null)
-				getNextQuestionsTask.cancel(true);
-			if (getStageTask != null)
-				getStageTask.cancel(true);
-			if (getStatsTask != null)
-				getStatsTask.cancel(true);
-			if (savedInstance.getUserId() != null) {
+            if (loginTask != null) {
+                loginTask.cancel(true);
+            }
+			if (userTask != null) {
+                userTask.cancel(true);
+            }
+			if (getScoreTask != null) {
+                getScoreTask.cancel(true);
+            }
+			if (getNextQuestionsTask != null) {
+                getNextQuestionsTask.cancel(true);
+            }
+			if (getStageTask != null) {
+                getStageTask.cancel(true);
+            }
+			if (getStatsTask != null) {
+                getStatsTask.cancel(true);
+            }
+			if (!savedInstance.getUserId().isEmpty()) {
 				DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(
 						savedInstance.isLogging() ? 1 : 0,
 								DatabaseHelper.COL_LOGGING,
@@ -4050,8 +3931,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 						savedInstance.getUserId());
 			}
 			Backendless.UserService.logout();
-			user = null;
-			savedInstance.setUserId(null);
+			savedInstance.setUserId("");
 			savedInstance.setDisplayName(null);
 			if (savedInstance.getCorrectAnswers() != null) {
 				savedInstance.getCorrectAnswers().clear();
@@ -4072,6 +3952,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
 		@Override
 		protected void onPostExecute(Void nothing) {
+            Log.i(Constants.LOG_TAG, "logouttask onPostExecute");
 			savedInstance.setLogging(false);
 			setLoggingOut(false);
 			if (!savedInstance.isInInfo()) {
@@ -4132,7 +4013,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 				if (savedInstance.getCorrectAnswers() != null &&
 						savedInstance.getCorrectAnswers().size() % 20 == 0) {
 					if (getBackground() == null) {
-						if (savedInstance.getUserId() != null) {
+						if (!savedInstance.getUserId().isEmpty()) {
 							if (isCancelled())
 								return null;
 							savedInstance.setPortBackground(
@@ -4501,6 +4382,9 @@ public class ActivityMain extends SlidingFragmentActivity implements
 		protected void onPostExecute(Void nothing) {
 			if (error != null && !isCancelled()) {
 				Log.e(Constants.LOG_TAG, "Error: " + error.getMessage());
+                if (loginTask != null) {
+                    loginTask.cancel(true);
+                }
 				if (userTask != null)
 					userTask.cancel(true);
 				currFrag.showNetworkProblem();
@@ -4580,8 +4464,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 				savedInstance.getQuestionSkips());
 	}
 
-	private void getStage(String userId, ArrayList<String> questionIds,
-			boolean resumed) {
+	private void getStage(String userId, ArrayList<String> questionIds, boolean resumed) {
 		if (getStageTask != null) {
             getStageTask.cancel(true);
         }
@@ -4603,15 +4486,13 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
 		@Override
 		protected Void doInBackground(Void... nothing) {
-            ArrayList<String> relations = new ArrayList<>(2);
-            relations.add("hint");
-            relations.add("skip");
-            try {
-                Backendless.Persistence.of(BackendlessUser.class).loadRelations(
-                        Backendless.UserService.CurrentUser(), relations);
-                Object[] hintObjects = (Object[]) Backendless.UserService.CurrentUser().getProperty("hint");
-                Object[] skipObjects = (Object[]) Backendless.UserService.CurrentUser().getProperty("skip");
+            List<BackendlessUser> userList = getUserRelations(userId, "hint", "skip");
+            if (userList != null && !userList.isEmpty()) {
+                BackendlessUser user = userList.get(0);
+				Object[] hints = (Object[]) user.getProperty("hint");
+				Object[] skips = (Object[]) user.getProperty("skip");
                 int index;
+                // TODO Make this more efficient by finding each of these in the pile of hints or skips
                 for (int i = 0; i < ids.size(); i++) {
                     index = savedInstance.getQuestionIds().indexOf(ids.get(i));
                     if (index >= 0) {
@@ -4623,9 +4504,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
                         }
                     }
                 }
-                for (Object hintObject : hintObjects) {
-                    Question hint = (Question) hintObject;
-                    index = savedInstance.getQuestionIds().indexOf(hint.getObjectId());
+                for (Object hint : hints) {
+                    index = savedInstance.getQuestionIds().indexOf(((HashMap<String, Object>) hint).get("objectId").toString());
                     if (index >= 0) {
                         savedInstance.getQuestionHints().set(index, Boolean.toString(true));
                     }
@@ -4634,9 +4514,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
                         progressed = true;
                     }
                 }
-                for (Object skipObject : skipObjects) {
-                    Question skip = (Question) skipObject;
-                    index = savedInstance.getQuestionIds().indexOf(skip.getObjectId());
+                for (Object skip : skips) {
+                    index = savedInstance.getQuestionIds().indexOf(((HashMap<String, Object>) skip).get("objectId").toString());
                     if (index >= 0) {
                         savedInstance.getQuestionSkips().set(index, Boolean.toString(true));
                     }
@@ -4644,11 +4523,6 @@ public class ActivityMain extends SlidingFragmentActivity implements
                         publishProgress();
                         progressed = true;
                     }
-                }
-            } catch (BackendlessException e) {
-                Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
-                if (currFrag != null) {
-                    currFrag.showNetworkProblem();
                 }
             }
 			return null;
@@ -4685,16 +4559,21 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
 	@Override
 	public String getUserId() {
-		return savedInstance.getUserId();
+		if (savedInstance == null) {
+			return "";
+		} else {
+			return savedInstance.getUserId();
+		}
 	}
 
 	@Override
 	public void setDisplayName(String displayName) {
 		currFrag.setDisplayName(displayName);
 		this.savedInstance.setDisplayName(displayName);
-		if (user != null) {
-			user.setProperty("displayName", displayName);
-            Backendless.UserService.update(user, new AsyncCallback<BackendlessUser>() {
+		if (savedInstance.getUserId() != null) {
+            // TODO Get user
+			Backendless.UserService.CurrentUser().setProperty("displayName", displayName);
+            Backendless.UserService.update(Backendless.UserService.CurrentUser(), new AsyncCallback<BackendlessUser>() {
                 @Override
                 public void handleResponse(BackendlessUser response) {
                     // TODO
@@ -4706,7 +4585,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
                 }
             });
 		}
-		if (savedInstance.getUserId() != null) {
+		if (!savedInstance.getUserId().isEmpty()) {
             DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(displayName,
                     DatabaseHelper.COL_DISPLAY_NAME, savedInstance.getUserId());
         }
@@ -4728,9 +4607,15 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	}
 
 	@Override
-	public void saveUserScore(final int currTemp) {
-        user.setProperty("score", currTemp);
-        Backendless.UserService.update(user, new AsyncCallback<BackendlessUser>() {
+	public void saveUserScore(final Integer currTemp) {
+        if (Backendless.UserService.CurrentUser() == null) {
+            if (loginTask != null) {
+                loginTask.cancel(true);
+            }
+            Backendless.UserService.setCurrentUser(Backendless.UserService.findById(getUserId()));
+        }
+        Backendless.UserService.CurrentUser().setProperty("score", currTemp);
+        Backendless.UserService.update(Backendless.UserService.CurrentUser(), new AsyncCallback<BackendlessUser>() {
             @Override
             public void handleResponse(BackendlessUser response) {
                 // TODO
@@ -4874,6 +4759,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
 	@Override
 	public void resetPassword(String username) {
+        Log.i(Constants.LOG_TAG, "resetting password for " + username);
         Backendless.UserService.restorePassword(username, new AsyncCallback<Void>() {
             @Override
             public void handleResponse(Void response) {
@@ -4882,6 +4768,7 @@ public class ActivityMain extends SlidingFragmentActivity implements
 
             @Override
             public void handleFault(BackendlessFault fault) {
+                Log.i(Constants.LOG_TAG, fault.toString());
                 ApplicationEx.showLongToast("An error occurred, try again");
             }
         });
@@ -4931,8 +4818,8 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	@Override
 	public void refreshMenu() {
 		if (mMenu != null) {
-			shareItem = mMenu.findItem(R.id.ShareMenu);
-			setlistItem = mMenu.findItem(R.id.SetlistMenu);
+            MenuItem shareItem = mMenu.findItem(R.id.ShareMenu);
+            MenuItem setlistItem = mMenu.findItem(R.id.SetlistMenu);
 			if (savedInstance.isInSetlist()) {
 				if (shareItem != null) {
 					shareItem.setVisible(true);
@@ -4989,24 +4876,29 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	}
 
 	@Override
-	public void setInChooser(boolean inChooser) {
-		if (savedInstance.isInChooser() == inChooser) {
-			return;
-		}
-		this.savedInstance.setInChooser(inChooser);
-		DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(inChooser ? 1 : 0,
-				DatabaseHelper.COL_IN_CHOOSER, savedInstance.getUserId());
-		refreshMenu();
-		refreshSlidingMenu();
-	}
-
-	@Override
 	public boolean getInSetlist() {
 		if (savedInstance.isInSetlist()) {
 			nManager.cancel(Constants.NOTIFICATION_NEW_SONG);
 		}
 		return savedInstance.isInSetlist();
 	}
+
+    @Override
+    public void setInChooser(boolean inChooser) {
+        if (savedInstance.isInChooser() == inChooser) {
+            return;
+        }
+        savedInstance.setInChooser(inChooser);
+        DatabaseHelperSingleton.instance(getApplicationContext()).setUserValue(inChooser ? 1 : 0,
+                DatabaseHelper.COL_IN_CHOOSER, savedInstance.getUserId());
+        refreshMenu();
+        refreshSlidingMenu();
+    }
+
+    @Override
+    public boolean getInChooser() {
+        return savedInstance.isInChooser();
+    }
 
 	@Override
 	public Bitmap getBitmap(int resId) throws OutOfMemoryError {
@@ -5037,21 +4929,18 @@ public class ActivityMain extends SlidingFragmentActivity implements
 					.getInt(ResourcesSingleton.instance(getApplicationContext()).getString(
 							R.string.level_key), Constants.HARD)) {
 			case Constants.EASY:
-				levelText.setText(ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.LevelTitle)
-						+ " (Easy)");
+                levelText.setText(String.format(ResourcesSingleton.instance(getApplicationContext())
+                        .getString(R.string.LevelTitle), "(Easy)"));
 				levelImage.setImageResource(R.drawable.ic_level_easy_inverse);
 				break;
 			case Constants.MEDIUM:
-				levelText.setText(ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.LevelTitle)
-						+ " (Medium)");
+                levelText.setText(String.format(ResourcesSingleton.instance(getApplicationContext())
+                        .getString(R.string.LevelTitle), "(Medium)"));
 				levelImage.setImageResource(R.drawable.ic_level_med_inverse);
 				break;
 			case Constants.HARD:
-				levelText.setText(ResourcesSingleton.instance(getApplicationContext()).getString(
-						R.string.LevelTitle)
-						+ " (Hard)");
+                levelText.setText(String.format(ResourcesSingleton.instance(getApplicationContext())
+                        .getString(R.string.LevelTitle), "(Hard)"));
 				levelImage.setImageResource(R.drawable.ic_level_hard_inverse);
 				break;
 			}
@@ -5282,5 +5171,22 @@ public class ActivityMain extends SlidingFragmentActivity implements
 	public void setSelectedSetInfo(SetInfo setInfo) {
 		savedInstance.setSelectedSet(setInfo);
 	}
+
+    private class LoginTask extends AsyncTask<Void, Void, Void> {
+
+        private LoginTask() {}
+
+        @Override
+        protected Void doInBackground(Void... nothing) {
+            if (savedInstance.isLoggedIn()) {
+                if (!savedInstance.getUserId().isEmpty()) {
+                    getUserData(savedInstance.getUserId());
+                    Backendless.UserService.setCurrentUser(Backendless.UserService.findById(getUserId()));
+                }
+            }
+            return null;
+        }
+
+    }
 
 }

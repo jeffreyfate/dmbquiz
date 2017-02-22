@@ -38,7 +38,7 @@
     
     <string name="LoadSetlist">Setlist</string>
     <string name="SwitchBackground">Switch Background</string>
-    <string name="LevelTitle">Level</string>
+    <string name="LevelTitle">Level %s</string>
     <string name="SoundsTitle">Sounds</string>
     <string name="NotificationSoundsTitle">Sound</string>
     <string name="NotificationVibrateTitle">Vibrate</string>
@@ -141,5 +141,7 @@
     <string name="left">Left Quick Tip</string>
     
     <string name="SetlistMenu">Setlist</string>
+
+    <string name="ServiceDown">Trivia temprorarily unavailable\nCheck back later for a new update!</string>
     
 </resources>

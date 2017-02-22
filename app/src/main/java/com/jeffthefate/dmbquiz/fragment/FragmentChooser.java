@@ -24,6 +24,7 @@ import com.jeffthefate.dmbquiz.R;
 import com.jeffthefate.dmbquiz.SetInfo;
 import com.jeffthefate.dmbquiz.SetlistAdapter;
 
+// TODO Save instance state on this fragment
 public class FragmentChooser extends FragmentBase {
     
 	private ExpandableListView setlistListView;

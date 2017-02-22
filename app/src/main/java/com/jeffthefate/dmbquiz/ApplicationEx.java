@@ -369,7 +369,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
 	    */
         // Log.v(Constants.LOG_TAG, "SERIAL: " + Build.SERIAL);
 
-        serialsList = new ArrayList<String>(0);
+        serialsList = new ArrayList<>(0);
         // Jay's old Incredible
         serialsList.add("HT1BNS215989");
         // Jay's old Rezound?
@@ -379,7 +379,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         // Jay's LG G2
         serialsList.add("017d103f6390e474");
     }
-    
+
     @Override
     public void onStacktrace(String appPackage, String packageVersion,
             String deviceModel, String androidVersion, String stacktrace) {
@@ -402,7 +402,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
             }
         });
     }
-    
+
     /**
      * Reports question to Parse to indicate there is an error in the question
      * or answer
@@ -442,7 +442,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
             // TODO
         }
     }
-    
+
     /**
      * Set indication if there is a network connection
      * @param hasConnection true if application is reporting a connection
@@ -450,7 +450,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     public static void setConnection(boolean hasConnection) {
         mHasConnection = hasConnection;
     }
-    
+
     /**
      * Reports if the application has a network connection
      * @return true if the application reports having a connection
@@ -458,7 +458,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     public static boolean hasConnection() {
         return mHasConnection;
     }
-    
+
     /**
      * Remove all cached files for this application, including directories
      */
@@ -473,7 +473,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
             }
         }
     }
-    
+
     /**
      * Helper to delete a directory in file structure
      * @param dir directory to be deleted
@@ -491,7 +491,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
             }
         }
     }
-    
+
     /**
      * Determines if the app is currently active, visible to the user
      * @return true if active, false otherwise
@@ -499,21 +499,21 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     public static boolean isActive() {
         return mIsActive;
     }
-    
+
     /**
      * Indicate that the application is active, visible to user
      */
     public static void setActive() {
         mIsActive = true;
     }
-    
+
     /**
      * Indicate that the application is not active, visible to user
      */
     public static void setInactive() {
         mIsActive = false;
     }
-    
+
     /**
      * Set preference of {@link java.util.ArrayList ArrayList} of
      * {@link java.lang.String Strings} to key
@@ -537,7 +537,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         }
         editor.apply();
     }
-    
+
     /**
      * Get string array preference given a specific key
      * @param key used to find preference
@@ -561,7 +561,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         }
         return answers;
     }
-    
+
     /**
      * Display an application-wide toast message, with short timeout
      * @param message string to display
@@ -573,7 +573,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     		mToast.show();
     	}
     }
-    
+
     /**
      * Display an application-wide toast message, with long timeout
      * @param message string to display
@@ -585,7 +585,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     		mToast.show();
     	}
     }
-    
+
     /**
      * Display an application-wide toast message, with long timeout
      * @param messageId resource id of string to display
@@ -593,7 +593,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
     public static void showLongToast(Context context, int messageId) {
     	showLongToast(context.getString(messageId));
     }
-    
+
     /**
      * Fetch the most recent setlist from the Parse service, along with the last
      * updated time and send broadcast to any receivers that there is a new
@@ -628,6 +628,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
 
             @Override
             public void handleResponse(BackendlessCollection<Setlist> setlists) {
+                Log.i(Constants.LOG_TAG, "Handling setlist response");
                 setlist = setlists.getCurrentPage().get(0).getSet();
                 df.setTimeZone(TimeZone.getDefault());
                 setStamp = "Updated:\n" + DateFormat.format(df.toLocalizedPattern(),
@@ -648,13 +649,15 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
             }
         });
     }
-    
+
     /**
      * Create a string list, separating each line of the setlist to an
      * individual string
      */
     public static void parseSetlist(String setlist) {
+        Log.i(Constants.LOG_TAG, "Parsing setlist");
         setlistList = new ArrayList<>(Arrays.asList(setlist.split("\n")));
+        Log.i(Constants.LOG_TAG, setlistList.toString());
     }
     
     /**
@@ -938,26 +941,10 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         if (resId == R.drawable.notification_large)
             return bitmap;
         double ratio = (double)bitmap.getHeight() / (double)bitmap.getWidth();
-        Bitmap smallBitmap;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-            smallBitmap = Bitmap.createScaledBitmap(bitmap,
-                    res.getDimensionPixelSize(
-                            android.R.dimen.notification_large_icon_width), 
-                    (int) (ratio < 1 ? res.getDimensionPixelSize(
-                        android.R.dimen.notification_large_icon_height)*ratio :
-                        res.getDimensionPixelSize(
-                            android.R.dimen.notification_large_icon_height)),
-                    true);
-        else
-            smallBitmap = Bitmap.createScaledBitmap(bitmap,
-                    res.getDimensionPixelSize(
-                            R.dimen.notification_large_icon_width), 
-                    (int) (ratio < 1 ? res.getDimensionPixelSize(
-                        R.dimen.notification_large_icon_height)*ratio :
-                        res.getDimensionPixelSize(
-                            R.dimen.notification_large_icon_height)),
-                    true);
-        return smallBitmap;
+        return Bitmap.createScaledBitmap(bitmap, res.getDimensionPixelSize(
+                android.R.dimen.notification_large_icon_width), (int) (ratio < 1 ? res.getDimensionPixelSize(
+                    android.R.dimen.notification_large_icon_height)*ratio : res.getDimensionPixelSize(
+                        android.R.dimen.notification_large_icon_height)), true);
     }
     
     /**

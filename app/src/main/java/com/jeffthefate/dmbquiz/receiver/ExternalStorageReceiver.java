@@ -27,11 +27,9 @@ public class ExternalStorageReceiver extends BroadcastReceiver {
                     context.getExternalCacheDir().getAbsolutePath();
             File path = new File(ApplicationEx.cacheLocation +
                     Constants.SCREENS_LOCATION);
-            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.FROYO) {
-                path.setExecutable(true, false);
-                path.setReadable(true, false);
-                path.setWritable(true, false);
-            }
+            path.setExecutable(true, false);
+            path.setReadable(true, false);
+            path.setWritable(true, false);
             path.mkdirs();
         }
     }

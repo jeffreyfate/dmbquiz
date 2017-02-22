@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Objects;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -68,7 +69,7 @@ public class FragmentQuiz extends FragmentBase {
     private ImageViewEx answerImage;
     private TextView retryText;
     private Button retryButton;
-    private Button upLevelButton;
+    //private Button upLevelButton;
     
     private long skipTick = 17000;
     private long hintTick = 15000;
@@ -92,9 +93,11 @@ public class FragmentQuiz extends FragmentBase {
     
     private InputMethodManager imm;
     
-    private HashMap<String, Boolean> stagedMap = new HashMap<String, Boolean>();
-    private HashMap<String, Boolean> saveMap = new HashMap<String, Boolean>();
-    private HashMap<String, Boolean> correctMap = new HashMap<String, Boolean>();
+    private HashMap<String, Boolean> stagedMap = new HashMap<>();
+    private HashMap<String, Boolean> saveMap = new HashMap<>();
+    private HashMap<String, Boolean> correctMap = new HashMap<>();
+
+    private StageTask stageTask;
     
     public FragmentQuiz() {
     }
@@ -120,7 +123,7 @@ public class FragmentQuiz extends FragmentBase {
         }
         imm = (InputMethodManager) getActivity().getSystemService(
                     Context.INPUT_METHOD_SERVICE);
-        if (savedInstanceState != null) {
+        if (savedInstanceState != null && mCallback != null) {
             /*
             savedAnswer = savedInstanceState.getString("answer");
             DatabaseHelperSingleton.instance(getActivity()).setUserValue(savedAnswer,
@@ -223,31 +226,19 @@ public class FragmentQuiz extends FragmentBase {
 			@Override
             public boolean onEditorAction(TextView v, int actionId,
                     KeyEvent event) {
-                if (mCallback != null && !mCallback.getNetworkProblem() &&
-                        !mCallback.isNewQuestion() &&
-                        (actionId == EditorInfo.IME_ACTION_DONE ||
-                        event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
-                    answerButton.setBackgroundResource(
-                            R.drawable.button_disabled);
+                if (mCallback != null && !mCallback.getNetworkProblem() && !mCallback.isNewQuestion() &&
+                        (actionId == EditorInfo.IME_ACTION_DONE || event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
+                    answerButton.setBackgroundResource(R.drawable.button_disabled);
                     answerButton.setTextColor(ResourcesSingleton.instance(getActivity()).getColor(R.color.light_gray));
                     answerButton.setText("ENTER");
                     answerButton.setEnabled(false);
-                    String entry = null;
-                    entry = v.getEditableText().toString();
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB)
-                        new VerifyTask(mCallback.getUserId(),
-                                mCallback.getQuestionId(0),
-                                mCallback.getQuestionHint(0)).execute(entry);
-                    else
-                        new VerifyTask(mCallback.getUserId(),
-                                mCallback.getQuestionId(0),
-                                mCallback.getQuestionHint(0)).executeOnExecutor(
-                                        AsyncTask.THREAD_POOL_EXECUTOR, entry);
+                    new VerifyTask(mCallback.getUserId(),mCallback.getQuestionId(0), mCallback.getQuestionHint(0))
+                            .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, v.getEditableText().toString());
                     imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
                     return true;
-                }
-                else
+                } else {
                     return false;
+                }
             } 
         });
         answerText.addTextChangedListener(new TextWatcher() {
@@ -286,28 +277,12 @@ public class FragmentQuiz extends FragmentBase {
                 if (mCallback != null) {
                     if (mCallback.isNewQuestion()) {
                     	answerButton.setText("NEXT");
-                        if (Build.VERSION.SDK_INT <
-                                Build.VERSION_CODES.HONEYCOMB)
-                            new NextTask().execute();
-                        else
-                            new NextTask().executeOnExecutor(
-                                    AsyncTask.THREAD_POOL_EXECUTOR);
+                        new NextTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
                     }
                     else {
                     	answerButton.setText("ENTER");
-                        if (Build.VERSION.SDK_INT <
-                                Build.VERSION_CODES.HONEYCOMB)
-                            new VerifyTask(mCallback.getUserId(),
-                                    mCallback.getQuestionId(0),
-                                    mCallback.getQuestionHint(0)).execute(
-                                    answerText.getEditableText().toString());
-                        else
-                            new VerifyTask(mCallback.getUserId(),
-                                    mCallback.getQuestionId(0),
-                                    mCallback.getQuestionHint(0))
-                                .executeOnExecutor(
-                                    AsyncTask.THREAD_POOL_EXECUTOR,
-                                    answerText.getEditableText().toString());
+                        new VerifyTask(mCallback.getUserId(), mCallback.getQuestionId(0), mCallback.getQuestionHint(0))
+                                .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, answerText.getEditableText().toString());
                     }
                 }
             }
@@ -419,6 +394,7 @@ public class FragmentQuiz extends FragmentBase {
                 }
             }
         });
+        /**
         upLevelButton = (Button) v.findViewById(R.id.UpLevelButton);
         upLevelButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -427,6 +403,7 @@ public class FragmentQuiz extends FragmentBase {
             	mCallback.updateLevel();
             }
         });
+         */
         if (!SharedPreferencesSingleton.instance(getActivity()).getString(
         		ResourcesSingleton.instance(getActivity()).getString(R.string.scoretext_key), "").equals("")) {
         	scoreText.setVisibility(View.VISIBLE);
@@ -623,13 +600,11 @@ public class FragmentQuiz extends FragmentBase {
     }
     
     private void indicateHint() {
-        if (hintTask != null)
+        if (hintTask != null) {
             hintTask.cancel(true);
+        }
         hintTask = new HintTask();
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB)
-            hintTask.execute();
-        else
-            hintTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        hintTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
     
     private class HintTask extends AsyncTask<Void, Void, Void> {
@@ -708,16 +683,9 @@ public class FragmentQuiz extends FragmentBase {
     @Override
     public void resumeQuestion() {
     	if (mCallback != null) {
-	        if (!mCallback.questionIdsEmpty() &&
-	        		mCallback.getQuestionId(0) != null &&
-	        		mCallback.isCorrectAnswer(mCallback.getQuestionId(0)) &&
-	                !mCallback.isNewQuestion()) {
-	            if (Build.VERSION.SDK_INT <
-	                    Build.VERSION_CODES.HONEYCOMB)
-	                new NextTask().execute();
-	            else
-	                new NextTask().executeOnExecutor(
-	                        AsyncTask.THREAD_POOL_EXECUTOR);
+	        if (!mCallback.questionIdsEmpty() && mCallback.getQuestionId(0) != null &&
+	        		mCallback.isCorrectAnswer(mCallback.getQuestionId(0)) && !mCallback.isNewQuestion()) {
+                new NextTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 	            return;
 	        }
 	        if (answerText != null)
@@ -775,9 +743,11 @@ public class FragmentQuiz extends FragmentBase {
 	        	retryText.setVisibility(View.INVISIBLE);
 	        if (retryButton != null)
 	        	retryButton.setVisibility(View.INVISIBLE);
+            /**
 	        if (upLevelButton != null) {
 	        	upLevelButton.setVisibility(View.INVISIBLE);
 	        }
+             */
 	        if (mCallback.isNewQuestion()) {
 	            answerButton.setText("NEXT");
 	            answerButton.setEnabled(true);
@@ -962,12 +932,15 @@ public class FragmentQuiz extends FragmentBase {
         editor.putString(ResourcesSingleton.instance(getActivity()).getString(R.string.skipnum_key),
         		skipTime.getText().toString());
         editor.apply();
-        if (!stagedMap.isEmpty())
-        	stageQuestions(mCallback.getUserId());
-        if (!saveMap.isEmpty())
-        	saveQuestionScores();
-        if (!correctMap.isEmpty())
-        	saveAnswers(mCallback.getUserId());
+        if (!stagedMap.isEmpty()) {
+            stageQuestions(mCallback.getUserId());
+        }
+        if (!saveMap.isEmpty()) {
+            saveQuestionScores();
+        }
+        if (!correctMap.isEmpty()) {
+            saveAnswers(mCallback.getUserId());
+        }
         super.onPause();
     }
     
@@ -1085,6 +1058,53 @@ public class FragmentQuiz extends FragmentBase {
         }
     }
 
+    private SaveAnswersTask saveAnswersTask;
+
+    private class SaveAnswersTask extends AsyncTask<Void, Void, Void> {
+
+        private String userId;
+
+        private SaveAnswersTask(String userId) {
+            this.userId = userId;
+        }
+
+        @Override
+        protected Void doInBackground(Void... nothing) {
+            QueryOptions queryOptions = new QueryOptions();
+            queryOptions.addRelated("correct");
+            queryOptions.setPageSize(1);
+            queryOptions.setOffset(0);
+            BackendlessDataQuery query = new BackendlessDataQuery();
+            query.setQueryOptions(queryOptions);
+            query.setWhereClause("objectId = '" + userId + "'");
+            // Get user corrects
+            BackendlessCollection<BackendlessUser> userCollection = Backendless.Data.of(BackendlessUser.class).find(query);
+            List<BackendlessUser> userList = userCollection.getData();
+            ArrayList<HashMap<String, Object>> correctsList = new ArrayList<>();
+            if (!userList.isEmpty()) {
+                BackendlessUser user = userList.get(0);
+                HashMap<String, Object>[] corrects = (HashMap<String, Object>[]) user.getProperty("correct");
+                // Remove any current corrects if already answered
+                for (HashMap<String, Object> correct : corrects) {
+                    correctMap.remove(correct.get("objectId").toString());
+                    correctsList.add(correct);
+                }
+                // Add all remaining correct answers to user
+                HashMap<String, Object> newCorrect;
+                for (Entry correct : correctMap.entrySet()) {
+                    newCorrect = new HashMap<>();
+                    newCorrect.put("___class", "Question");
+                    newCorrect.put("objectId", correct.getKey());
+                    correctsList.add(newCorrect);
+                }
+                user.setProperty("correct", correctsList.toArray());
+                // Save user
+                Backendless.Persistence.of(BackendlessUser.class).save(user);
+            }
+            return null;
+        }
+    }
+
     /**
      * Get all "CorrectAnswers" associated with user and given questions
      * Remove all already answers, if any, from the local correct answers
@@ -1098,80 +1118,11 @@ public class FragmentQuiz extends FragmentBase {
      * @param userId
      */
     private void saveAnswers(final String userId) {
-        List<String> relations = new ArrayList<>(1);
-        relations.add("correct");
-        Backendless.Persistence.of(BackendlessUser.class).loadRelations(
-                Backendless.UserService.CurrentUser(), relations,
-                new AsyncCallback<BackendlessUser>() {
-                    @Override
-                    public void handleResponse(final BackendlessUser currentUser) {
-                        // Get all correct with current user
-                        BackendlessDataQuery query = new BackendlessDataQuery();
-                        String whereClause = "Users[correct].username = '" + userId + "'";
-                        if (!correctMap.isEmpty()) {
-                            whereClause += " AND ";
-                            whereClause += buildInclusionWhereClause(new ArrayList<>(correctMap.keySet()));
-                        }
-                        query.setWhereClause(whereClause);
-                        Backendless.Persistence.of(Question.class).find(query,
-                                new AsyncCallback<BackendlessCollection<Question>>() {
-                                    @Override
-                                    public void handleResponse(BackendlessCollection<Question> questionCollection) {
-                                        List<Question> questions = questionCollection.getCurrentPage();
-                                        for (Question question : questions) {
-                                            correctMap.remove(question.getObjectId());
-                                        }
-                                        // All have left is ones to add to correct
-                                        // Get the questions with the ids remaining, then add them
-                                        if (!correctMap.isEmpty()) {
-                                            BackendlessDataQuery query = new BackendlessDataQuery();
-                                            query.setWhereClause(buildInclusionWhereClause(new ArrayList<>(correctMap.keySet())));
-                                            Backendless.Persistence.of(Question.class).find(query,
-                                                    new AsyncCallback<BackendlessCollection<Question>>() {
-                                                        @Override
-                                                        public void handleResponse(BackendlessCollection<Question> questionCollection) {
-                                                            List<Question> corrects = Arrays.asList((Question[]) currentUser.getProperty("correct"));
-                                                            List<Question> questions = questionCollection.getCurrentPage();
-                                                            corrects.addAll(questions);
-                                                            Backendless.UserService.update(currentUser, new AsyncCallback<BackendlessUser>() {
-                                                                @Override
-                                                                public void handleResponse(BackendlessUser response) {
-                                                                    correctMap.clear();
-                                                                }
-
-                                                                @Override
-                                                                public void handleFault(BackendlessFault fault) {
-                                                                    Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                                                    showNetworkProblem();
-                                                                }
-                                                            });
-                                                        }
-
-                                                        @Override
-                                                        public void handleFault(BackendlessFault fault) {
-                                                            Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                                            showNetworkProblem();
-                                                        }
-                                                    });
-                                        }
-                                    }
-
-                                    @Override
-                                    public void handleFault(BackendlessFault fault) {
-                                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                        showNetworkProblem();
-                                    }
-                                }
-                        );
-                    }
-
-                    @Override
-                    public void handleFault(BackendlessFault fault) {
-                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                        showNetworkProblem();
-                    }
-                }
-        );
+        if (saveAnswersTask != null) {
+            saveAnswersTask.cancel(true);
+        }
+        saveAnswersTask = new SaveAnswersTask(userId);
+        saveAnswersTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
     /**
@@ -1179,6 +1130,7 @@ public class FragmentQuiz extends FragmentBase {
      * For each of those, increase the score if skipped; decrease the score if not skipped
      * Save
      */
+    // TODO Use AsyncTask instead
     private void saveQuestionScores() {
         BackendlessDataQuery query = new BackendlessDataQuery();
         if (saveMap.isEmpty()) {
@@ -1268,12 +1220,12 @@ public class FragmentQuiz extends FragmentBase {
         case Constants.MEDIUM:
         	questionText.setText("Congratulations!\nYou've answered all the easy and medium questions!" +
         			"\nChange level for more questions");
-        	upLevelButton.setVisibility(View.VISIBLE);
+        	// upLevelButton.setVisibility(View.VISIBLE);
         	break;
         case Constants.EASY:
         	questionText.setText("Congratulations!\nYou've answered all the easy questions!" +
         			"\nChange level for more questions");
-        	upLevelButton.setVisibility(View.VISIBLE);
+        	// upLevelButton.setVisibility(View.VISIBLE);
         	break;
         case Constants.HARD:
     	default:
@@ -1367,142 +1319,101 @@ public class FragmentQuiz extends FragmentBase {
      * @param userId
      */
     private void stageQuestions(final String userId) {
-        List<String> relations = new ArrayList<>(2);
-        relations.add("hint");
-        relations.add("skip");
-        Backendless.Persistence.of(BackendlessUser.class).loadRelations(
-            Backendless.UserService.CurrentUser(), relations,
-                new AsyncCallback<BackendlessUser>() {
-                    @Override
-                    public void handleResponse(final BackendlessUser currentUser) {
-                        // Get all questions with current user
-                        BackendlessDataQuery query = new BackendlessDataQuery();
-                        String whereClause = "Users[skip].username = '" + userId + "'";
-                        if (!stagedMap.isEmpty()) {
-                            whereClause += " AND ";
-                            whereClause += buildInclusionWhereClause(new ArrayList<>(stagedMap.keySet()));
-                        }
-                        query.setWhereClause(whereClause);
-                        Backendless.Persistence.of(Question.class).find(query,
-                                new AsyncCallback<BackendlessCollection<Question>>() {
-                                    @Override
-                                    public void handleResponse(BackendlessCollection<Question> questionCollection) {
-                                        HashMap<String, Boolean> map = new HashMap<>(stagedMap);
-                                        List<Question> questions = questionCollection.getCurrentPage();
-                                        for (Question question : questions) {
-                                            map.remove(question.getObjectId());
-                                        }
-                                        // All have left is ones to add to skip
-                                        // Get the questions with the ids remaining, then add them
-                                        if (!map.isEmpty()) {
-                                            BackendlessDataQuery query = new BackendlessDataQuery();
-                                            query.setWhereClause(buildInclusionWhereClause(new ArrayList<>(map.keySet())));
-                                            Backendless.Persistence.of(Question.class).find(query,
-                                                    new AsyncCallback<BackendlessCollection<Question>>() {
-                                                @Override
-                                                public void handleResponse(BackendlessCollection<Question> questionCollection) {
-                                                    List<Question> skips = Arrays.asList((Question[]) currentUser.getProperty("skip"));
-                                                    List<Question> questions = questionCollection.getCurrentPage();
-                                                    skips.addAll(questions);
-                                                    Backendless.UserService.update(currentUser, new AsyncCallback<BackendlessUser>() {
-                                                        @Override
-                                                        public void handleResponse(BackendlessUser response) {
-                                                            // TODO
-                                                        }
+        if (stageTask != null) {
+            stageTask.cancel(true);
+        }
+        stageTask = new StageTask(userId);
+        stageTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    }
 
-                                                        @Override
-                                                        public void handleFault(BackendlessFault fault) {
-                                                            Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                                            showNetworkProblem();
-                                                        }
-                                                    });
-                                                }
+    // Get hint and skip relations from user (possibly already exist)
+    // Save any updates to those relations
+    private class StageTask extends AsyncTask<Void, Void, Void> {
 
-                                                @Override
-                                                public void handleFault(BackendlessFault fault) {
-                                                    Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                                    showNetworkProblem();
-                                                }
-                                            });
-                                        }
-                                        // Get hints
-                                        BackendlessDataQuery query = new BackendlessDataQuery();
-                                        String whereClause = "Users[hint].username = '" + userId + "'";
-                                        if (!correctMap.isEmpty()) {
-                                            whereClause += " AND ";
-                                            whereClause += buildInclusionWhereClause(new ArrayList<>(stagedMap.keySet()));
-                                        }
-                                        query.setWhereClause(whereClause);
-                                        Backendless.Persistence.of(Question.class).find(query,
-                                                new AsyncCallback<BackendlessCollection<Question>>() {
-                                                    @Override
-                                                    public void handleResponse(BackendlessCollection<Question> questionCollection) {
-                                                        HashMap<String, Boolean> map = new HashMap<>(stagedMap);
-                                                        stagedMap.clear();
-                                                        List<Question> questions = questionCollection.getCurrentPage();
-                                                        for (Question question : questions) {
-                                                            map.remove(question.getObjectId());
-                                                        }
-                                                        // All have left is ones to add to hint
-                                                        // Get the questions with the ids remaining, then add them
-                                                        if (!map.isEmpty()) {
-                                                            BackendlessDataQuery query = new BackendlessDataQuery();
-                                                            query.setWhereClause(buildInclusionWhereClause(new ArrayList<>(map.keySet())));
-                                                            Backendless.Persistence.of(Question.class).find(query,
-                                                                    new AsyncCallback<BackendlessCollection<Question>>() {
-                                                                        @Override
-                                                                        public void handleResponse(BackendlessCollection<Question> questionCollection) {
-                                                                            List<Question> hints = Arrays.asList((Question[]) currentUser.getProperty("hint"));
-                                                                            List<Question> questions = questionCollection.getCurrentPage();
-                                                                            hints.addAll(questions);
-                                                                            Backendless.UserService.update(currentUser, new AsyncCallback<BackendlessUser>() {
-                                                                                @Override
-                                                                                public void handleResponse(BackendlessUser response) {
-                                                                                    // TODO
-                                                                                }
+        private String userId;
 
-                                                                                @Override
-                                                                                public void handleFault(BackendlessFault fault) {
-                                                                                    Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                                                                    showNetworkProblem();
-                                                                                }
-                                                                            });
-                                                                        }
+        private StageTask(String userId) {
+            this.userId = userId;
+        }
 
-                                                                        @Override
-                                                                        public void handleFault(BackendlessFault fault) {
-                                                                            Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                                                            showNetworkProblem();
-                                                                        }
-                                                                    });
-                                                        }
-                                                    }
-
-                                                    @Override
-                                                    public void handleFault(BackendlessFault fault) {
-                                                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                                        showNetworkProblem();
-                                                    }
-                                                }
-                                        );
-                                    }
-
-                                    @Override
-                                    public void handleFault(BackendlessFault fault) {
-                                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                                        showNetworkProblem();
-                                    }
-                                }
-                        );
-                    }
-
-                    @Override
-                    public void handleFault(BackendlessFault fault) {
-                        Log.e(Constants.LOG_TAG, "Error: " + fault.getMessage());
-                        showNetworkProblem();
-                    }
+        @Override
+        protected Void doInBackground(Void... nothing) {
+            BackendlessUser user = getUserWithRelations(userId, "correct", "hint", "skip");
+            if (user == null) {
+                return null;
+            }
+            Object[] corrects = (Object[]) user.getProperty("correct");
+            Object[] hints = (Object[]) user.getProperty("hint");
+            Object[] skips = (Object[]) user.getProperty("skip");
+            HashMap<String, Boolean> map = new HashMap<>(stagedMap);
+            // Don't need to update anything if already answered correctly
+            for (Object correct : corrects) {
+                map.remove(((HashMap<String, Object>) correct).get("objectId"));
+            }
+            // If already hinted, no need to update
+            Boolean hinted;
+            for (Object hint : hints) {
+                hinted = map.get(((HashMap<String, Object>) hint).get("objectId"));
+                if (hinted != null && hinted) {
+                    map.remove(((HashMap<String, Object>) hint).get("objectId"));
                 }
-        );
+            }
+            // If already skipped, no need to update
+            for (Object skip : skips) {
+                map.remove(((HashMap<String, Object>) skip).get("objectId"));
+            }
+            // Add these to the hint and skip lists
+            List<Object> hintList = Arrays.asList(hints);
+            List<Object> skipList = Arrays.asList(skips);
+            HashMap<String, Object> tempQuestion;
+            for (Entry<String, Boolean> entry : map.entrySet()) {
+                tempQuestion = new HashMap<>();
+                tempQuestion.put("objectId", entry.getKey());
+                skipList.add(tempQuestion);
+                if (entry.getValue()) {
+                    hintList.add(tempQuestion);
+                }
+            }
+            if (!hintList.isEmpty()) {
+                user.setProperty("hint", hintList.toArray());
+            }
+            if (!skipList.isEmpty()) {
+                user.setProperty("skip", skipList.toArray());
+            }
+            try {
+                Backendless.UserService.update(user);
+            } catch (BackendlessException e) {
+                Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
+                publishProgress(null);
+            }
+            return null;
+        }
+
+        @Override
+        protected void onProgressUpdate(Void... nothing) {
+            showNetworkProblem();
+        }
+
+        private BackendlessUser getUserWithRelations(String userId, String... relations) {
+            // Get users with relations
+            QueryOptions queryOptions = new QueryOptions();
+            for (String relation : relations) {
+                queryOptions.addRelated(relation);
+            }
+            queryOptions.setPageSize(1);
+            queryOptions.setOffset(0);
+            BackendlessDataQuery query = new BackendlessDataQuery();
+            query.setQueryOptions(queryOptions);
+            query.setWhereClause("objectId = '" + userId + "'");
+            try {
+                return Backendless.Data.of(BackendlessUser.class).find(query).getData().get(0);
+            } catch (BackendlessException e) {
+                Log.e(Constants.LOG_TAG, "Error: " + e.getMessage());
+                publishProgress(null);
+                return null;
+            }
+        }
+
     }
     
     @Override

@@ -15,6 +15,7 @@ import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.view.ViewPager;
 import android.support.v4.view.ViewPager.OnPageChangeListener;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,6 +25,7 @@ import android.widget.Scroller;
 
 import com.google.android.gms.analytics.HitBuilders;
 import com.jeffthefate.dmbquiz.ApplicationEx.DatabaseHelperSingleton;
+import com.jeffthefate.dmbquiz.Constants;
 import com.jeffthefate.dmbquiz.DatabaseHelper;
 import com.jeffthefate.dmbquiz.R;
 import com.jeffthefate.dmbquiz.activity.ActivityMain;
@@ -33,9 +35,6 @@ public class FragmentPager extends FragmentBase {
     
     private ActivityMain activity;
     private ViewPager viewPager;
-    private FragmentBase fragment;
-    
-    private String userId = null;
     private boolean loggedIn = false;
     private boolean inStats = false;
     
@@ -45,33 +44,32 @@ public class FragmentPager extends FragmentBase {
     public void onAttach(Activity activity) {
     	super.onAttach(activity);
     	this.activity = (ActivityMain) activity;
-    	if (mCallback != null)
-    		mCallback.setHomeAsUp(true);
+    	if (mCallback != null) {
+            mCallback.setHomeAsUp(true);
+        }
     }
     
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        userId = DatabaseHelperSingleton.instance(getActivity()).getCurrUser();
+        String userId = DatabaseHelperSingleton.instance(getActivity()).getUserId();
+        Log.i(Constants.LOG_TAG, "FragmentPager onCreate: " + userId);
         if (userId != null) {
-            loggedIn = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
-                    DatabaseHelper.COL_LOGGED_IN, userId) == 1 ? true : false;
-            inStats = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(
-                    DatabaseHelper.COL_IN_STATS, userId) == 1 ? true : false;
+            loggedIn = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(DatabaseHelper.COL_LOGGED_IN,
+                    userId) == 1;
+            inStats = DatabaseHelperSingleton.instance(getActivity()).getUserIntValue(DatabaseHelper.COL_IN_STATS,
+                    userId) == 1;
         }
-        fragment = getFragmentForPager();
+        FragmentBase fragment = getFragmentForPager();
         viewPager = new ViewPager(activity);
         viewPager.setId("VP".hashCode());
-        viewPager.setAdapter(new PagerAdapter(getChildFragmentManager(),
-                fragment));
-
+        viewPager.setAdapter(new PagerAdapter(getChildFragmentManager(), fragment));
         viewPager.setOnPageChangeListener(new OnPageChangeListener() {
             @Override
             public void onPageScrollStateChanged(int state) {}
 
             @Override
-            public void onPageScrolled(int position, float positionOffset,
-                    int positionOffsetPixels) {}
+            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {}
 
             @Override
             public void onPageSelected(int position) {
@@ -79,22 +77,25 @@ public class FragmentPager extends FragmentBase {
                     switch (position) {
                     case 0:
                         mCallback.setInSetlist(false);
+                        mCallback.setInChooser(false);
                         if (mCallback.getCurrFrag() instanceof FragmentSplash) {
                         	tracker.setScreenName("ActivityMain/FragmentSplash");
                             tracker.send(new HitBuilders.ScreenViewBuilder().build());
                         }
-                        else if (mCallback.getCurrFrag() instanceof
-                        		FragmentQuiz) {
+                        else if (mCallback.getCurrFrag() instanceof FragmentQuiz) {
                         	tracker.setScreenName("ActivityMain/FragmentQuiz");
                             tracker.send(new HitBuilders.ScreenViewBuilder().build());
                         }
                         break;
                     case 1:
                         mCallback.setInSetlist(true);
+                        mCallback.setInChooser(false);
                         tracker.setScreenName("ActivityMain/FragmentSetlist");
                         tracker.send(new HitBuilders.ScreenViewBuilder().build());
                         break;
                     case 2:
+                        mCallback.setInSetlist(false);
+                        mCallback.setInChooser(true);
                     	tracker.setScreenName("ActivityMain/FragmentChooser");
                         tracker.send(new HitBuilders.ScreenViewBuilder().build());
                         break;
@@ -108,22 +109,18 @@ public class FragmentPager extends FragmentBase {
 
         });
         //sInterpolator = new LinearInterpolator();
-        sInterpolator = new AccelerateInterpolator();
+        AccelerateInterpolator sInterpolator = new AccelerateInterpolator();
         try {
             Field mScroller;
             mScroller = ViewPager.class.getDeclaredField("mScroller");
             mScroller.setAccessible(true); 
-            FixedSpeedScroller scroller = new FixedSpeedScroller(
-                    viewPager.getContext(), sInterpolator);
+            FixedSpeedScroller scroller = new FixedSpeedScroller(viewPager.getContext(), sInterpolator);
             scroller.setFixedDuration(200);
             mScroller.set(viewPager, scroller);
-        } catch (NoSuchFieldException e) {
-        } catch (IllegalArgumentException e) {
-        } catch (IllegalAccessException e) {
+        } catch (NoSuchFieldException|IllegalArgumentException|IllegalAccessException e) {
+            // TODO 1
         }
     }
-    
-    private AccelerateInterpolator sInterpolator;
     
     @Override
     public void onResume() {
@@ -133,17 +130,23 @@ public class FragmentPager extends FragmentBase {
                 viewPager.setCurrentItem(1);
                 mCallback.setInSetlist(true);
                 mCallback.setGoToSetlist(false);
+                mCallback.setInChooser(false);
+            } else if (mCallback.getInChooser()) {
+                viewPager.setCurrentItem(2);
+                mCallback.setInSetlist(false);
+                mCallback.setGoToSetlist(false);
             }
             else {
                 viewPager.setCurrentItem(0);
                 mCallback.setInSetlist(false);
+                mCallback.setGoToSetlist(false);
+                mCallback.setInChooser(false);
             }
         }
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
     	super.onCreateView(inflater, container, savedInstanceState);
     	return viewPager;
     }
@@ -154,7 +157,7 @@ public class FragmentPager extends FragmentBase {
 
         public PagerAdapter(FragmentManager fm, FragmentBase frag) {
             super(fm);
-            mFragments = new ArrayList<FragmentBase>();
+            mFragments = new ArrayList<>();
             mFragments.add(frag);
             mFragments.add(new FragmentSetlist());
             mFragments.add(new FragmentChooser());
@@ -169,25 +172,23 @@ public class FragmentPager extends FragmentBase {
         public Fragment getItem(int position) {
             return mFragments.get(position);
         }
-        
+
         public ArrayList<FragmentBase> getFragmentList() {
             return mFragments;
         }
 
     }
-    
+
     public void removeChildren(FragmentTransaction ft) {
-        ft.setCustomAnimations(R.anim.zero_anim, R.anim.zero_anim,
-                R.anim.zero_anim, R.anim.zero_anim);
-        for (FragmentBase fragment :
-                ((PagerAdapter)viewPager.getAdapter()).getFragmentList())
+        ft.setCustomAnimations(R.anim.zero_anim, R.anim.zero_anim, R.anim.zero_anim, R.anim.zero_anim);
+        for (FragmentBase fragment : ((PagerAdapter)viewPager.getAdapter()).getFragmentList()) {
             ft.remove(fragment);
+        }
     }
-    
+
     @Override
     public void resumeQuestion() {
-        ((PagerAdapter) viewPager.getAdapter()).getFragmentList()
-                .get(0).resumeQuestion();
+        ((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(0).resumeQuestion();
     }
     /*
     @Override
@@ -198,21 +199,22 @@ public class FragmentPager extends FragmentBase {
     */
     @Override
     public void setBackground(Context context, Bitmap background) {
-        ((PagerAdapter) viewPager.getAdapter()).getFragmentList()
-                .get(0).setBackground(context, background);
+        ((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(0).setBackground(context, background);
     }
-    
+
     @Override
     public Drawable getBackground() {
-        return ((PagerAdapter) viewPager.getAdapter())
-                .getFragmentList().get(0).getBackground();
+        return ((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(0).getBackground();
     }
-    
+
     public FragmentBase getPage(int position) {
     	return (FragmentBase) ((FragmentPagerAdapter) viewPager.getAdapter()).getItem(position);
     }
-    
+
     public FragmentBase getFragmentForPager() {
+        Log.i(Constants.LOG_TAG, "FragmentPager getFragmentForPager: " + loggedIn);
+        return new FragmentDown();
+        /**
         if (!loggedIn) {
             return new FragmentSplash();
         }
@@ -224,6 +226,7 @@ public class FragmentPager extends FragmentBase {
                 return new FragmentQuiz();
             }
         }
+         */
     }
     
     @Override
@@ -238,28 +241,25 @@ public class FragmentPager extends FragmentBase {
     
     @Override
 	public void showResizedSetlist() {
-    	((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(1)
-				.showResizedSetlist();
+    	((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(1).showResizedSetlist();
     }
 
 	@Override
 	public void hideResizedSetlist() {
-		((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(1)
-				.hideResizedSetlist();
+		((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(1).hideResizedSetlist();
 	}
 	
 	@Override
     public void showNoMoreQuestions(int level) {
-		((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(0)
-				.showNoMoreQuestions(level);
+		((PagerAdapter) viewPager.getAdapter()).getFragmentList().get(0).showNoMoreQuestions(level);
     }
 	
 	@Override
     public void showNetworkProblem() {
-		ArrayList<FragmentBase> fragments =
-				((PagerAdapter) viewPager.getAdapter()).getFragmentList();
-		for (FragmentBase fragment : fragments)
-			fragment.showNetworkProblem();
+		ArrayList<FragmentBase> fragments = ((PagerAdapter) viewPager.getAdapter()).getFragmentList();
+		for (FragmentBase fragment : fragments) {
+            fragment.showNetworkProblem();
+        }
     }
     
     public class FixedSpeedScroller extends Scroller {
@@ -274,8 +274,7 @@ public class FragmentPager extends FragmentBase {
             super(context, interpolator);
         }
 
-        public FixedSpeedScroller(Context context, Interpolator interpolator,
-                boolean flywheel) {
+        public FixedSpeedScroller(Context context, Interpolator interpolator, boolean flywheel) {
             super(context, interpolator, flywheel);
         }
 
@@ -302,8 +301,7 @@ public class FragmentPager extends FragmentBase {
 	}
     
     @Override
-	public void updateSetlistMap(
-			TreeMap<String, TreeMap<String, String>> setlistMap) {
+	public void updateSetlistMap(TreeMap<String, TreeMap<String, String>> setlistMap) {
     	getPage(2).updateSetlistMap(setlistMap);
     }
     

@@ -1,5 +1,7 @@
 package com.jeffthefate.dmbquiz;
 
+import android.util.*;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.TreeMap;
@@ -184,6 +186,9 @@ public class SavedInstance implements Serializable {
 	}
 
 	public String getUserId() {
+		if (userId == null) {
+			userId = "";
+		}
 		return userId;
 	}
 

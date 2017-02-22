@@ -18,6 +18,7 @@ import android.os.Handler;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.LayoutInflater;
@@ -72,6 +73,10 @@ public class SlidingMenu extends RelativeLayout {
 
 	private OnCloseListener mCloseListener;
 
+    private Context mContext;
+
+    private DisplayMetrics mMetrics;
+
 	/**
 	 * The listener interface for receiving onOpen events.
 	 * The class that is interested in processing a onOpen
@@ -117,7 +122,6 @@ public class SlidingMenu extends RelativeLayout {
 	 * the onClose event occurs, that object's appropriate
 	 * method is invoked.
 	 *
-	 * @see OnCloseEvent
 	 */
 	public interface OnCloseListener {
 
@@ -199,7 +203,8 @@ public class SlidingMenu extends RelativeLayout {
 	 */
 	public SlidingMenu(Context context, AttributeSet attrs, int defStyle) {
 		super(context, attrs, defStyle);
-		
+		mContext = context;
+        mMetrics = new DisplayMetrics();
 		LayoutParams behindParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
 		mViewBehind = new CustomViewBehind(context);
 		addView(mViewBehind, behindParams);
@@ -1003,6 +1008,32 @@ public class SlidingMenu extends RelativeLayout {
 				}
 			});
 		}
+	}
+
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		Log.i("SlidingMenu", "incoming width spec: " + widthMeasureSpec);
+		Log.i("SlidingMenu", "incoming height spec: " + heightMeasureSpec);
+		WindowManager windowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
+		windowManager.getDefaultDisplay().getMetrics(mMetrics);
+		int realWidth = mMetrics.widthPixels;
+		int realHeight = mMetrics.heightPixels;
+		Log.i("SlidingMenu", "real width: " + realWidth);
+		Log.i("SlidingMenu", "real height: " + realHeight);
+		/**
+		 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+		 windowManager.getDefaultDisplay().getRealMetrics(metrics);
+		 realWidth = metrics.widthPixels;
+		 realHeight = metrics.heightPixels;
+		 }
+		 Log.i("SlidingMenu", "real width: " + realWidth);
+		 Log.i("SlidingMenu", "real height: " + realHeight);
+		 */
+		final int realWidthMeasureSpec = MeasureSpec.makeMeasureSpec(realWidth, MeasureSpec.EXACTLY);
+		final int realHeightMeasureSpec = MeasureSpec.makeMeasureSpec(realHeight, MeasureSpec.EXACTLY);
+		Log.i("SlidingMenu", "real width spec: " + realWidthMeasureSpec);
+		Log.i("SlidingMenu", "real height spec: " + realHeightMeasureSpec);
+		super.onMeasure(realWidthMeasureSpec, realHeightMeasureSpec);
 	}
 
 }

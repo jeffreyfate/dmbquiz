@@ -42,8 +42,7 @@ public class FragmentFaq extends FragmentBase {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
     	super.onCreateView(inflater, container, savedInstanceState);
         View v = inflater.inflate(R.layout.faq, container, false);
         background = (ImageViewEx) v.findViewById(R.id.Background);

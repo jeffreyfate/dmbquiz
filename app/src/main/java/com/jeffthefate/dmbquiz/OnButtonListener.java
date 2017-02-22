@@ -264,7 +264,7 @@ public interface OnButtonListener {
      * Save given score to Parse for the current user
      * @param currTemp score to save
      */
-    public void saveUserScore(final int currTemp);
+    public void saveUserScore(final Integer currTemp);
     
     /**
      * Capture the current screen and start a share intent using the file path
@@ -398,5 +398,7 @@ public interface OnButtonListener {
     public SetInfo getSelectedSetInfo();
     
     public void setSelectedSetInfo(SetInfo setInfo);
+
+    public boolean getInChooser();
     
 }

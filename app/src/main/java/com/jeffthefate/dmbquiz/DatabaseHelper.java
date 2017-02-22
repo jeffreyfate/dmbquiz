@@ -267,9 +267,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     
     public void addUser(BackendlessUser user, String type) {
         ContentValues cv = new ContentValues();
-        cv.put(COL_USER_ID, (String) user.getProperty("username"));
+        cv.put(COL_USER_ID, user.getUserId());
         cv.put(COL_USER_TYPE, type);
-        cv.put(COL_SCORE, (String) user.getProperty("score"));
+        cv.put(COL_SCORE, (Integer) user.getProperty("score"));
         cv.put(COL_OFFSET, 1);
         insertRecord(cv, USER_TABLE, COL_USER_ID);
     }
@@ -404,15 +404,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
     
     public boolean isAnonUser(String userId) {
-    	if (userId == null)
-    		return true;
-        Cursor cur = db.query(USER_TABLE, new String[] {}, COL_USER_ID + "=?",
-                new String[] {userId}, null, null, null);
+    	if (userId == null) {
+            return true;
+        }
+        Cursor cur = db.query(USER_TABLE, new String[] {}, COL_USER_ID + "=?", new String[] {userId}, null, null, null);
         boolean isAnon = false;
         if (cur.moveToFirst()) {
-            if (cur.getString(cur.getColumnIndex(COL_USER_TYPE))
-                    .equals("Anonymous"))
+            if (cur.getString(cur.getColumnIndex(COL_USER_TYPE)).equals("Anonymous")) {
                 isAnon = true;
+            }
         }
         cur.close();
         return isAnon;
@@ -485,6 +485,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
     
     public long setOffset(int offset, String userId) {
+        Log.i(Constants.LOG_TAG, "setOffset " + offset + " on " + userId);
     	if (userId == null)
     		return -1;
         ContentValues cv = new ContentValues();
@@ -493,14 +494,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 new String[] {userId});
     }
     
-    public String getCurrUser() {
-        Cursor cur = db.query(USER_TABLE, new String[] {COL_USER_ID},
-                COL_OFFSET + "=?", new String[] {"1"}, null, null, null);
-        String userId = null;
-        if (cur.moveToFirst())
-            userId = cur.getString(cur.getColumnIndex(COL_USER_ID));
+    public String getUserId() {
+        Cursor cur = db.query(USER_TABLE, new String[] {COL_USER_ID}, COL_OFFSET + "=?", new String[] {"1"}, null,
+                null, null);
+        String userToken = "";
+        if (cur.moveToFirst()) {
+            userToken = cur.getString(cur.getColumnIndex(COL_USER_ID));
+        }
         cur.close();
-        return userId;
+        return userToken;
     }
     /*
     public long setQuestions(String userId, String currQuestionId,
