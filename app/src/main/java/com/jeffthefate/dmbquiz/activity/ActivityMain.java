@@ -1495,15 +1495,11 @@ public class ActivityMain extends SlidingFragmentActivity implements
 												R.string.notificationtype_key), 1);
 						switch (typeSetting) {
 						case 0:
-							notificationAlbumText
-									.setText(
-										R.string.NotificationTypeAlbumTitle);
+							notificationAlbumText.setText(R.string.NotificationTypeAlbumTitle);
 							typeSetting = 1;
 							break;
 						case 1:
-							notificationAlbumText
-									.setText(
-										R.string.NotificationTypeStandardTitle);
+							notificationAlbumText.setText(R.string.NotificationTypeStandardTitle);
 							typeSetting = 0;
 							/*
 							 * if (DatabaseHelperSingleton.instance()

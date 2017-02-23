@@ -142,6 +142,6 @@
     
     <string name="SetlistMenu">Setlist</string>
 
-    <string name="ServiceDown">Trivia temprorarily unavailable\nCheck back later for a new update!</string>
+    <string name="ServiceDown">Sorry, trivia is temporarily unavailable\n\nCheck back later for a new update!</string>
     
 </resources>

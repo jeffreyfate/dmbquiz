@@ -356,7 +356,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         try {
             SharedPreferencesSingleton.putInt(R.string.notificationtype_key,
                     SharedPreferencesSingleton.instance(getApplicationContext()).getBoolean(
-                            notificationType, false) ? 1 : 0);
+                            notificationType, true) ? 1 : 0);
         } catch (ClassCastException e) {
             // TODO
         }

@@ -160,7 +160,7 @@ public class FragmentPager extends FragmentBase {
             mFragments = new ArrayList<>();
             mFragments.add(frag);
             mFragments.add(new FragmentSetlist());
-            mFragments.add(new FragmentChooser());
+            // mFragments.add(new FragmentChooser());
         }
 
         @Override
@@ -314,7 +314,7 @@ public class FragmentPager extends FragmentBase {
     public void updateSetText() {
     	super.updateSetText();
     	getPage(1).updateSetText();
-    	getPage(2).updateSetText();
+    	// getPage(2).updateSetText();
     }
     
 }
