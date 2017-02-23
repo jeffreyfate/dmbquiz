@@ -343,7 +343,7 @@ public class ApplicationEx extends Application implements OnStacktraceListener {
         Backendless.Messaging.registerDevice("596253330527", "setlist", new AsyncCallback<Void>() {
             @Override
             public void handleResponse(Void response) {
-                // TODO
+                Log.i(Constants.LOG_TAG, "Registered for notifications");
             }
 
             @Override

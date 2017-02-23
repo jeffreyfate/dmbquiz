@@ -35,12 +35,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name="com.backendless.push.BackendlessPushService" />
-        <receiver android:name="com.backendless.push.BackendlessBroadcastReceiver"
+        <service android:name="com.jeffthefate.dmbquiz.receiver.PushService" />
+        <receiver android:name="com.jeffthefate.dmbquiz.receiver.PushReceiver"
             android:permission="com.google.android.c2dm.permission.SEND">
             <intent-filter>
                 <action android:name="com.google.android.c2dm.intent.RECEIVE"/>
                 <action android:name="com.google.android.c2dm.intent.REGISTRATION"/>
+                <action android:name="com.jeffthefate.dmb.ACTION_NEW_QUESTIONS" />
+                <action android:name="com.jeffthefate.dmb.ACTION_NEW_SONG" />
                 <category android:name="com.jeffthefate.dmbquiz"/>
             </intent-filter>
         </receiver>
@@ -52,6 +54,7 @@
             </intent-filter>
         </receiver>
         -->
+        <!--
         <receiver
             android:name=".receiver.PushReceiver"
             android:exported="false" >
@@ -60,6 +63,7 @@
 			    <action android:name="com.jeffthefate.dmb.ACTION_NEW_SONG" />
 			</intent-filter>
 		</receiver>
+		-->
 		<receiver
             android:name=".receiver.ConnectivityReceiver"
             android:exported="false" >

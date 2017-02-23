@@ -383,6 +383,8 @@ public class FragmentSetlist extends FragmentBase implements SwipeRefreshLayout.
         
         @Override
         protected void onPostExecute(String setlist) {
+            Log.i(Constants.LOG_TAG, "Fetched setlist:");
+            Log.i(Constants.LOG_TAG, setlist);
         	Log.i(Constants.LOG_TAG, "Turning off refreshing");
         	setlistSwipe.setRefreshing(false);
         	if (setlist != null) {
